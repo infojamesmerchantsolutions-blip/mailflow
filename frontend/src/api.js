@@ -1,0 +1,31 @@
+import axios from 'axios';
+
+const API = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'https://mailflow-production-db59.up.railway.app'
+});
+
+// Accounts
+export const getAccounts = () => API.get('/api/accounts');
+export const getAuthUrl = () => API.get('/api/accounts/auth');
+export const deleteAccount = (id) => API.delete(`/api/accounts/${id}`);
+export const resetAccount = (id) => API.post(`/api/accounts/${id}/reset`);
+
+// Campaigns
+export const getCampaigns = () => API.get('/api/campaigns');
+export const getCampaign = (id) => API.get(`/api/campaigns/${id}`);
+export const createCampaign = (data) => API.post('/api/campaigns', data);
+export const launchCampaign = (id) => API.post(`/api/campaigns/${id}/launch`);
+export const pauseCampaign = (id) => API.post(`/api/campaigns/${id}/pause`);
+export const resumeCampaign = (id) => API.post(`/api/campaigns/${id}/resume`);
+export const deleteCampaign = (id) => API.delete(`/api/campaigns/${id}`);
+
+// Contacts
+export const getContactLists = () => API.get('/api/contacts/lists');
+export const addManualContacts = (data) => API.post('/api/contacts/manual', data);
+export const uploadCSV = (formData) => API.post('/api/contacts/upload', formData);
+export const deleteContactList = (name) => API.delete(`/api/contacts/lists/${name}`);
+
+// Queue & Stats
+export const getQueue = () => API.get('/api/queue');
+export const getStats = () => API.get('/api/queue/stats');
+export const getLogs = () => API.get('/api/queue/logs');
