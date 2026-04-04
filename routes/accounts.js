@@ -21,8 +21,12 @@ router.get('/', (req, res) => {
 router.get('/auth', (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/gmail.send']
+    prompt: 'consent select_account',
+    scope: [
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/userinfo.email'
+    ]
   });
   res.json({ url });
 });
@@ -48,7 +52,16 @@ router.get('/callback', async (req, res) => {
       `).run(email, tokens.access_token, tokens.refresh_token, tokens.expiry_date);
     }
 
-    res.send(`<h2>Account ${email} connected successfully! You can close this tab.</h2>`);
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 60px;">
+          <h2 style="color: #3B6D11;">Account connected successfully!</h2>
+          <p>${email} has been added to MailFlow.</p>
+          <p>You can close this tab and go back to your dashboard.</p>
+          <script>setTimeout(() => window.close(), 3000);</script>
+        </body>
+      </html>
+    `);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
