@@ -31,8 +31,9 @@ db.exec(`
     body_plain TEXT,
     contact_list TEXT NOT NULL,
     delay_seconds INTEGER DEFAULT 30,
-    start_time TEXT DEFAULT '08:00',
-    end_time TEXT DEFAULT '22:00',
+    start_time TEXT DEFAULT '00:00',
+    end_time TEXT DEFAULT '23:59',
+    schedule_type TEXT DEFAULT 'immediate',
     status TEXT DEFAULT 'draft',
     total_contacts INTEGER DEFAULT 0,
     sent_count INTEGER DEFAULT 0,
@@ -63,5 +64,18 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 `);
+
+// Migrations — adds new columns if they don't exist yet
+const migrations = [
+  `ALTER TABLE campaigns ADD COLUMN schedule_type TEXT DEFAULT 'immediate'`,
+];
+
+migrations.forEach(sql => {
+  try {
+    db.exec(sql);
+  } catch (e) {
+    // Column already exists — ignore
+  }
+});
 
 module.exports = db;
