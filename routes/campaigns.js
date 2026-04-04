@@ -25,7 +25,7 @@ router.post('/', (req, res) => {
   try {
     const {
       name, subject, body_html, body_plain,
-      contact_list, delay_seconds, start_time, end_time
+      contact_list, delay_seconds, start_time, end_time, schedule_type
     } = req.body;
 
     const contacts = db.prepare(
@@ -34,13 +34,13 @@ router.post('/', (req, res) => {
 
     const result = db.prepare(`
       INSERT INTO campaigns 
-        (name, subject, body_html, body_plain, contact_list, delay_seconds, start_time, end_time, total_contacts)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (name, subject, body_html, body_plain, contact_list, delay_seconds, start_time, end_time, total_contacts, schedule_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, subject, body_html, body_plain,
       contact_list, delay_seconds || 30,
-      start_time || '08:00', end_time || '22:00',
-      contacts.count
+      start_time || '00:00', end_time || '23:59',
+      contacts.count, schedule_type || 'immediate'
     );
 
     res.json({ id: result.lastInsertRowid, success: true });
@@ -70,6 +70,9 @@ router.post('/:id/launch', (req, res) => {
       return res.status(400).json({ error: 'No active Gmail accounts connected' });
     }
 
+    // Clear any existing queue for this campaign
+    db.prepare("DELETE FROM queue WHERE campaign_id = ? AND status = 'pending'").run(campaign.id);
+
     const insertQueue = db.prepare(`
       INSERT INTO queue (campaign_id, recipient_email, account_id, status)
       VALUES (?, ?, ?, 'pending')
@@ -84,7 +87,9 @@ router.post('/:id/launch', (req, res) => {
 
     insertMany();
 
-    db.prepare("UPDATE campaigns SET status = 'running' WHERE id = ?").run(campaign.id);
+    db.prepare(`
+      UPDATE campaigns SET status = 'running', sent_count = 0, failed_count = 0 WHERE id = ?
+    `).run(campaign.id);
 
     res.json({ success: true, queued: contacts.length });
   } catch (err) {
