@@ -15,23 +15,25 @@ const s = {
   input: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none' },
   select: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
   row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
-  row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' },
-  editorWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '0.5px solid #ccc', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' },
-  editorPane: { display: 'flex', flexDirection: 'column' },
-  editorHeader: { padding: '8px 12px', background: '#f5f5f0', borderBottom: '0.5px solid #ccc', fontSize: '12px', fontWeight: '500', color: '#666' },
-  editorTextarea: { width: '100%', fontSize: '12px', padding: '12px', border: 'none', borderRight: '0.5px solid #ccc', resize: 'none', minHeight: '260px', fontFamily: 'monospace', lineHeight: '1.6', outline: 'none', background: '#fff' },
-  previewPane: { background: '#fff', minHeight: '260px', overflow: 'auto' },
-  previewInner: { padding: '16px', fontSize: '13px', lineHeight: '1.7' },
-  plainTextarea: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', resize: 'vertical', minHeight: '80px', lineHeight: '1.6', outline: 'none', fontFamily: 'inherit' },
-  scheduleGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px', marginTop: '6px' },
-  schedOpt: { border: '0.5px solid #ccc', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', textAlign: 'center' },
+  variationCard: { border: '0.5px solid #e0e0d8', borderRadius: '10px', padding: '14px', marginBottom: '12px', background: '#fafaf8' },
+  variationHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' },
+  variationTitle: { fontSize: '13px', fontWeight: '500', color: '#111' },
+  editorWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '0.5px solid #ccc', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' },
+  editorHeader: { padding: '7px 12px', background: '#f5f5f0', borderBottom: '0.5px solid #ccc', fontSize: '12px', fontWeight: '500', color: '#666' },
+  editorTextarea: { width: '100%', fontSize: '12px', padding: '10px', border: 'none', borderRight: '0.5px solid #ccc', resize: 'none', minHeight: '200px', fontFamily: 'monospace', lineHeight: '1.6', outline: 'none', background: '#fff' },
+  plainTextarea: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', resize: 'vertical', minHeight: '70px', lineHeight: '1.6', outline: 'none', fontFamily: 'inherit' },
+  speedGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px', marginTop: '6px' },
+  speedOpt: { border: '0.5px solid #ccc', borderRadius: '8px', padding: '8px 6px', cursor: 'pointer', textAlign: 'center' },
+  speedOptSel: { border: '1.5px solid #185FA5', background: '#e6f1fb' },
+  speedLabel: { fontSize: '12px', fontWeight: '500', color: '#111' },
+  speedLabelSel: { fontSize: '12px', fontWeight: '500', color: '#185FA5' },
+  speedSub: { fontSize: '10px', color: '#888', marginTop: '2px' },
+  scheduleGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px', marginTop: '6px' },
+  schedOpt: { border: '0.5px solid #ccc', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer' },
   schedOptSel: { border: '1.5px solid #185FA5', background: '#e6f1fb' },
   schedLabel: { fontSize: '13px', fontWeight: '500', color: '#111' },
   schedLabelSel: { fontSize: '13px', fontWeight: '500', color: '#185FA5' },
   schedSub: { fontSize: '11px', color: '#888', marginTop: '2px' },
-  speedGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px', marginTop: '6px' },
-  speedOpt: { border: '0.5px solid #ccc', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', textAlign: 'center' },
-  speedOptSel: { border: '1.5px solid #185FA5', background: '#e6f1fb' },
   campRow: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '0.5px solid #e0e0d8' },
   campName: { fontSize: '14px', color: '#111', fontWeight: '500' },
   campSub: { fontSize: '12px', color: '#888', marginTop: '3px' },
@@ -44,15 +46,21 @@ const s = {
   pillCompleted: { background: '#e6f1fb', color: '#185FA5' },
   success: { background: '#eaf3de', border: '0.5px solid #c0dd97', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#3B6D11', marginBottom: '12px' },
   error: { background: '#fcebeb', border: '0.5px solid #f7c1c1', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#A32D2D', marginBottom: '12px' },
-  infoBox: { background: '#e6f1fb', border: '0.5px solid #b5d4f4', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#185FA5', marginTop: '8px', marginBottom: '4px' },
+  infoBox: { background: '#e6f1fb', border: '0.5px solid #b5d4f4', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#185FA5', marginTop: '6px', marginBottom: '8px' },
   divider: { border: 'none', borderTop: '0.5px solid #e0e0d8', margin: '16px 0' },
   footerBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' },
+  addVariationBtn: { padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: '1.5px dashed #ccc', background: '#fff', cursor: 'pointer', width: '100%', color: '#666', marginBottom: '12px' },
+  removeBtn: { fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '0.5px solid #f7c1c1', background: '#fff', color: '#A32D2D', cursor: 'pointer' },
+  countInput: { width: '80px', fontSize: '13px', padding: '7px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none', textAlign: 'center' },
+  variantBadge: { display: 'inline-block', fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '999px', background: '#e6f1fb', color: '#185FA5', marginRight: '8px' },
 };
 
 const speedOptions = [
-  { label: 'Safe', sub: '60s delay', value: 60 },
-  { label: 'Balanced', sub: '30s delay', value: 30 },
-  { label: 'Fast', sub: '10s delay', value: 10 },
+  { label: '60s', sub: 'Safest', value: 60 },
+  { label: '30s', sub: 'Balanced', value: 30 },
+  { label: '10s', sub: 'Fast', value: 10 },
+  { label: '5s', sub: 'Faster', value: 5 },
+  { label: '3s', sub: 'Fastest', value: 3 },
 ];
 
 const defaultHtml = `<h2 style="color:#111;">Hello there!</h2>
@@ -61,21 +69,91 @@ const defaultHtml = `<h2 style="color:#111;">Hello there!</h2>
 <a href="https://yoursite.com" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;border-radius:6px;text-decoration:none;">Click here</a>
 <p style="color:#888;font-size:12px;margin-top:24px;">To unsubscribe, reply to this email.</p>`;
 
+const emptyVariation = () => ({
+  id: Date.now(),
+  subject: '',
+  body_html: defaultHtml,
+  body_plain: 'Hello there!\n\nThis is your email content.\n\nTo unsubscribe, reply to this email.',
+});
+
+function VariationEditor({ variation, index, onChange, onRemove, showRemove }) {
+  const previewRef = useRef(null);
+
+  useEffect(() => {
+    if (previewRef.current) {
+      previewRef.current.srcdoc = `
+        <html>
+          <body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">
+            ${variation.body_html}
+          </body>
+        </html>`;
+    }
+  }, [variation.body_html]);
+
+  return (
+    <div style={s.variationCard}>
+      <div style={s.variationHeader}>
+        <div>
+          <span style={s.variantBadge}>Variation {index + 1}</span>
+          <span style={{ fontSize: '12px', color: '#888' }}>Randomly selected when sending</span>
+        </div>
+        {showRemove && <button style={s.removeBtn} onClick={onRemove}>Remove</button>}
+      </div>
+
+      <div style={s.label}>Subject line</div>
+      <input
+        style={s.input}
+        placeholder={`e.g. Subject line variation ${index + 1}`}
+        value={variation.subject}
+        onChange={e => onChange({ ...variation, subject: e.target.value })}
+      />
+
+      <div style={s.label}>Email body (HTML + live preview)</div>
+      <div style={s.editorWrap}>
+        <div>
+          <div style={s.editorHeader}>HTML editor</div>
+          <textarea
+            style={s.editorTextarea}
+            value={variation.body_html}
+            onChange={e => onChange({ ...variation, body_html: e.target.value })}
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <div style={s.editorHeader}>Live preview</div>
+          <iframe
+            ref={previewRef}
+            style={{ width: '100%', minHeight: '200px', border: 'none' }}
+            title={`preview-${index}`}
+            sandbox="allow-same-origin"
+          />
+        </div>
+      </div>
+
+      <div style={s.label}>Plain text fallback</div>
+      <textarea
+        style={s.plainTextarea}
+        value={variation.body_plain}
+        onChange={e => onChange({ ...variation, body_plain: e.target.value })}
+        placeholder="Plain text version..."
+      />
+    </div>
+  );
+}
+
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [lists, setLists] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
-  const [htmlBody, setHtmlBody] = useState(defaultHtml);
-  const [plainBody, setPlainBody] = useState('Hello there!\n\nThis is your email content.\n\nTo unsubscribe, reply to this email.');
+  const [variations, setVariations] = useState([emptyVariation()]);
   const [speed, setSpeed] = useState(30);
   const [scheduleType, setScheduleType] = useState('immediate');
   const [form, setForm] = useState({
-    name: '', subject: '', contact_list: '',
+    name: '', contact_list: '',
     start_time: '08:00', end_time: '22:00'
   });
-  const previewRef = useRef(null);
 
   const load = async () => {
     try {
@@ -87,37 +165,52 @@ export default function Campaigns() {
 
   useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    if (previewRef.current) {
-      previewRef.current.srcdoc = `
-        <html>
-          <body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">
-            ${htmlBody}
-          </body>
-        </html>`;
-    }
-  }, [htmlBody]);
-
   const showMsg = (m) => { setMsg(m); setTimeout(() => setMsg(null), 5000); };
   const showErr = (e) => { setErr(e); setTimeout(() => setErr(null), 5000); };
 
+  const addVariation = () => setVariations([...variations, emptyVariation()]);
+
+  const updateVariation = (index, updated) => {
+    const newVars = [...variations];
+    newVars[index] = updated;
+    setVariations(newVars);
+  };
+
+  const removeVariation = (index) => {
+    setVariations(variations.filter((_, i) => i !== index));
+  };
+
   const validate = () => {
     if (!form.name) return showErr('Please enter a campaign name') || false;
-    if (!form.subject) return showErr('Please enter a subject line') || false;
     if (!form.contact_list) return showErr('Please select a contact list') || false;
-    if (!htmlBody && !plainBody) return showErr('Please add an email body') || false;
+    for (let i = 0; i < variations.length; i++) {
+      if (!variations[i].subject) return showErr(`Please enter subject line for Variation ${i + 1}`) || false;
+      if (!variations[i].body_html && !variations[i].body_plain) return showErr(`Please add email body for Variation ${i + 1}`) || false;
+    }
     return true;
   };
 
   const buildPayload = () => ({
-    ...form,
-    body_html: htmlBody,
-    body_plain: plainBody,
+    name: form.name,
+    subject: variations[0].subject,
+    body_html: variations[0].body_html,
+    body_plain: variations[0].body_plain,
+    contact_list: form.contact_list,
     delay_seconds: speed,
     schedule_type: scheduleType,
     start_time: scheduleType === 'immediate' ? '00:00' : form.start_time,
     end_time: scheduleType === 'immediate' ? '23:59' : form.end_time,
+    content_variations: JSON.stringify(variations),
+    content_mode: 'random',
   });
+
+  const resetForm = () => {
+    setShowForm(false);
+    setForm({ name: '', contact_list: '', start_time: '08:00', end_time: '22:00' });
+    setVariations([emptyVariation()]);
+    setSpeed(30);
+    setScheduleType('immediate');
+  };
 
   const handleSaveDraft = async () => {
     if (!validate()) return;
@@ -134,19 +227,10 @@ export default function Campaigns() {
     try {
       const res = await createCampaign(buildPayload());
       await launchCampaign(res.data.id);
-      showMsg('Campaign launched! Emails are now being sent.');
+      showMsg('Campaign launched! Emails are now being sent randomly across all variations.');
       resetForm();
       load();
     } catch (e) { showErr(e.response?.data?.error || 'Error launching campaign'); }
-  };
-
-  const resetForm = () => {
-    setShowForm(false);
-    setForm({ name: '', subject: '', contact_list: '', start_time: '08:00', end_time: '22:00' });
-    setHtmlBody(defaultHtml);
-    setPlainBody('Hello there!\n\nThis is your email content.');
-    setSpeed(30);
-    setScheduleType('immediate');
   };
 
   const handleLaunch = async (id) => {
@@ -218,51 +302,41 @@ export default function Campaigns() {
             </div>
           </div>
 
-          <div style={s.label}>Email subject line</div>
-          <input style={s.input} placeholder="e.g. You don't want to miss this!" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} />
-
           <hr style={s.divider} />
 
-          <div style={s.cardTitle}>Email body</div>
-          <div style={s.editorWrap}>
-            <div style={s.editorPane}>
-              <div style={s.editorHeader}>HTML editor</div>
-              <textarea
-                style={s.editorTextarea}
-                value={htmlBody}
-                onChange={e => setHtmlBody(e.target.value)}
-                spellCheck={false}
-              />
-            </div>
-            <div style={s.editorPane}>
-              <div style={s.editorHeader}>Live preview</div>
-              <iframe
-                ref={previewRef}
-                style={{ width: '100%', minHeight: '260px', border: 'none' }}
-                title="preview"
-                sandbox="allow-same-origin"
-              />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={s.cardTitle}>Email content variations</div>
+            <div style={{ fontSize: '12px', color: '#888' }}>{variations.length} variation{variations.length > 1 ? 's' : ''} · randomly distributed</div>
           </div>
 
-          <div style={s.label}>Plain text version <span style={{ color: '#aaa', fontWeight: '400' }}>(shown if HTML fails to load)</span></div>
-          <textarea style={s.plainTextarea} value={plainBody} onChange={e => setPlainBody(e.target.value)} />
+          <div style={s.infoBox}>
+            Add multiple subject lines and email bodies. The system will randomly pick one for each recipient — this helps avoid spam filters when sending to large lists.
+          </div>
+
+          {variations.map((v, i) => (
+            <VariationEditor
+              key={v.id}
+              variation={v}
+              index={i}
+              onChange={(updated) => updateVariation(i, updated)}
+              onRemove={() => removeVariation(i)}
+              showRemove={variations.length > 1}
+            />
+          ))}
+
+          <button style={s.addVariationBtn} onClick={addVariation}>
+            + Add another variation
+          </button>
 
           <hr style={s.divider} />
 
           <div style={s.cardTitle}>Schedule</div>
-
-          <div style={s.label}>When to send</div>
           <div style={s.scheduleGrid}>
             {[
-              { label: 'Send immediately', sub: 'Starts right after launch', value: 'immediate' },
+              { label: 'Send immediately', sub: 'Starts right after launch, runs 24/7', value: 'immediate' },
               { label: 'Set time window', sub: 'Only send between certain hours', value: 'window' },
             ].map(opt => (
-              <div
-                key={opt.value}
-                style={{ ...s.schedOpt, ...(scheduleType === opt.value ? s.schedOptSel : {}) }}
-                onClick={() => setScheduleType(opt.value)}
-              >
+              <div key={opt.value} style={{ ...s.schedOpt, ...(scheduleType === opt.value ? s.schedOptSel : {}) }} onClick={() => setScheduleType(opt.value)}>
                 <div style={scheduleType === opt.value ? s.schedLabelSel : s.schedLabel}>{opt.label}</div>
                 <div style={s.schedSub}>{opt.sub}</div>
               </div>
@@ -282,34 +356,24 @@ export default function Campaigns() {
             </div>
           )}
 
-          {scheduleType === 'immediate' && (
-            <div style={s.infoBox}>
-              Emails will start sending immediately after you click Launch, running 24/7 until complete.
-            </div>
-          )}
-
           <div style={s.label}>Sending speed</div>
           <div style={s.speedGrid}>
             {speedOptions.map(opt => (
-              <div
-                key={opt.value}
-                style={{ ...s.speedOpt, ...(speed === opt.value ? s.speedOptSel : {}) }}
-                onClick={() => setSpeed(opt.value)}
-              >
-                <div style={speed === opt.value ? s.schedLabelSel : s.schedLabel}>{opt.label}</div>
-                <div style={s.schedSub}>{opt.sub}</div>
+              <div key={opt.value} style={{ ...s.speedOpt, ...(speed === opt.value ? s.speedOptSel : {}) }} onClick={() => setSpeed(opt.value)}>
+                <div style={speed === opt.value ? s.speedLabelSel : s.speedLabel}>{opt.label}</div>
+                <div style={s.speedSub}>{opt.sub}</div>
               </div>
             ))}
           </div>
 
-          <div style={{ ...s.row2, alignItems: 'center' }}>
+          <div style={s.row2}>
             <div>
               <div style={s.label}>Custom delay (seconds)</div>
-              <input style={s.input} type="number" min="5" value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+              <input style={s.input} type="number" min="1" value={speed} onChange={e => setSpeed(Number(e.target.value))} />
             </div>
             {getEstimate() && (
               <div style={{ ...s.infoBox, marginTop: '20px' }}>
-                Estimated completion time: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts
+                Estimated time: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts at {speed}s delay
               </div>
             )}
           </div>
@@ -333,6 +397,7 @@ export default function Campaigns() {
               <div style={s.campSub}>
                 {c.contact_list} · {c.delay_seconds}s delay · {c.sent_count}/{c.total_contacts} sent
                 {c.failed_count > 0 && <span style={{ color: '#A32D2D' }}> · {c.failed_count} failed</span>}
+                {c.content_variations && (() => { try { return ` · ${JSON.parse(c.content_variations).length} variations`; } catch(e) { return ''; } })()}
               </div>
               <div style={s.progressBar}>
                 <div style={{ ...s.progressFill, width: `${getPct(c)}%` }} />
