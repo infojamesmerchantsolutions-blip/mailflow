@@ -9,6 +9,9 @@ export const getAccounts = () => API.get('/api/accounts');
 export const getAuthUrl = () => API.get('/api/accounts/auth');
 export const deleteAccount = (id) => API.delete(`/api/accounts/${id}`);
 export const resetAccount = (id) => API.post(`/api/accounts/${id}/reset`);
+export const pauseAccount = (id) => API.post(`/api/accounts/${id}/pause`);
+export const resumeAccount = (id) => API.post(`/api/accounts/${id}/resume`);
+export const updateDisplayName = (id, display_name) => API.put(`/api/accounts/${id}/display-name`, { display_name });
 
 // Campaigns
 export const getCampaigns = () => API.get('/api/campaigns');
