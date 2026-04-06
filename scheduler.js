@@ -2,12 +2,6 @@ const cron = require('node-cron');
 const db = require('./db');
 const { google } = require('googleapis');
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
 async function getAuthForAccount(account) {
   const accountClient = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -32,10 +26,15 @@ async function getAuthForAccount(account) {
   return accountClient;
 }
 
-function makeEmail(to, subject, bodyHtml, bodyPlain) {
+function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain) {
   const boundary = 'mailflow_boundary';
+  const fromField = fromName
+    ? `${fromName} <${fromEmail}>`
+    : fromEmail;
+
   const message = [
     `To: ${to}`,
+    `From: ${fromField}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -60,6 +59,31 @@ function makeEmail(to, subject, bodyHtml, bodyPlain) {
     .replace(/=+$/, '');
 }
 
+function pickContent(campaign) {
+  // Try to use content variations if available
+  if (campaign.content_variations) {
+    try {
+      const variations = JSON.parse(campaign.content_variations);
+      if (variations && variations.length > 0) {
+        // Pick random variation
+        const pick = variations[Math.floor(Math.random() * variations.length)];
+        return {
+          subject: pick.subject,
+          body_html: pick.body_html,
+          body_plain: pick.body_plain
+        };
+      }
+    } catch (e) {}
+  }
+
+  // Fall back to main campaign content
+  return {
+    subject: campaign.subject,
+    body_html: campaign.body_html,
+    body_plain: campaign.body_plain
+  };
+}
+
 async function processSendQueue() {
   try {
     const runningCampaigns = db.prepare("SELECT * FROM campaigns WHERE status = 'running'").all();
@@ -67,24 +91,41 @@ async function processSendQueue() {
 
     for (const campaign of runningCampaigns) {
       const queueItem = db.prepare(`
-        SELECT q.*, a.email as account_email, a.access_token, a.refresh_token, a.token_expiry, a.id as acc_id
+        SELECT q.*, 
+          a.email as account_email, 
+          a.display_name as account_display_name,
+          a.access_token, 
+          a.refresh_token, 
+          a.token_expiry, 
+          a.id as acc_id
         FROM queue q
         JOIN accounts a ON q.account_id = a.id
-        WHERE q.campaign_id = ? AND q.status = 'pending' AND a.status = 'active'
+        WHERE q.campaign_id = ? 
+          AND q.status = 'pending' 
+          AND a.status = 'active'
         ORDER BY q.id ASC
         LIMIT 1
       `).get(campaign.id);
 
       if (!queueItem) {
-        const remaining = db.prepare("SELECT COUNT(*) as count FROM queue WHERE campaign_id = ? AND status = 'pending'").get(campaign.id);
+        const remaining = db.prepare(`
+          SELECT COUNT(*) as count FROM queue 
+          WHERE campaign_id = ? AND status = 'pending'
+        `).get(campaign.id);
+
         if (remaining.count === 0) {
           db.prepare("UPDATE campaigns SET status = 'completed' WHERE id = ?").run(campaign.id);
-          console.log(`Campaign ${campaign.name} completed!`);
+          console.log(`Campaign "${campaign.name}" completed!`);
+        } else {
+          console.log(`Campaign "${campaign.name}" has ${remaining.count} pending but no active accounts`);
         }
         continue;
       }
 
       try {
+        // Pick random content variation
+        const content = pickContent(campaign);
+
         console.log(`Sending to ${queueItem.recipient_email} via ${queueItem.account_email}...`);
 
         const auth = await getAuthForAccount({
@@ -95,11 +136,14 @@ async function processSendQueue() {
         });
 
         const gmail = google.gmail({ version: 'v1', auth });
+
         const raw = makeEmail(
           queueItem.recipient_email,
-          campaign.subject,
-          campaign.body_html,
-          campaign.body_plain
+          queueItem.account_display_name,
+          queueItem.account_email,
+          content.subject,
+          content.body_html,
+          content.body_plain
         );
 
         await gmail.users.messages.send({
