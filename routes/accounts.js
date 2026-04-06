@@ -11,7 +11,7 @@ const oauth2Client = new google.auth.OAuth2(
 
 router.get('/', (req, res) => {
   try {
-    const accounts = db.prepare('SELECT id, email, status, daily_sent, last_reset, created_at FROM accounts').all();
+    const accounts = db.prepare('SELECT id, email, display_name, status, daily_sent, last_reset, created_at FROM accounts').all();
     res.json(accounts);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -54,14 +54,45 @@ router.get('/callback', async (req, res) => {
 
     res.send(`
       <html>
-        <body style="font-family: sans-serif; text-align: center; padding: 60px;">
-          <h2 style="color: #3B6D11;">Account connected successfully!</h2>
+        <body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2 style="color:#3B6D11;">Account connected successfully!</h2>
           <p>${email} has been added to MailFlow.</p>
           <p>You can close this tab and go back to your dashboard.</p>
           <script>setTimeout(() => window.close(), 3000);</script>
         </body>
       </html>
     `);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update display name
+router.put('/:id/display-name', (req, res) => {
+  try {
+    const { display_name } = req.body;
+    db.prepare('UPDATE accounts SET display_name = ? WHERE id = ?').run(display_name, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Pause account
+router.post('/:id/pause', (req, res) => {
+  try {
+    db.prepare("UPDATE accounts SET status = 'paused' WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Resume account
+router.post('/:id/resume', (req, res) => {
+  try {
+    db.prepare("UPDATE accounts SET status = 'active' WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
