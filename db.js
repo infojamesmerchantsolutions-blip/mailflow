@@ -7,6 +7,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
+    display_name TEXT,
     access_token TEXT,
     refresh_token TEXT,
     token_expiry INTEGER,
@@ -34,6 +35,8 @@ db.exec(`
     start_time TEXT DEFAULT '00:00',
     end_time TEXT DEFAULT '23:59',
     schedule_type TEXT DEFAULT 'immediate',
+    content_variations TEXT,
+    content_mode TEXT DEFAULT 'random',
     status TEXT DEFAULT 'draft',
     total_contacts INTEGER DEFAULT 0,
     sent_count INTEGER DEFAULT 0,
@@ -65,17 +68,16 @@ db.exec(`
   );
 `);
 
-// Migrations — adds new columns if they don't exist yet
+// Migrations
 const migrations = [
   `ALTER TABLE campaigns ADD COLUMN schedule_type TEXT DEFAULT 'immediate'`,
+  `ALTER TABLE campaigns ADD COLUMN content_variations TEXT`,
+  `ALTER TABLE campaigns ADD COLUMN content_mode TEXT DEFAULT 'random'`,
+  `ALTER TABLE accounts ADD COLUMN display_name TEXT`,
 ];
 
 migrations.forEach(sql => {
-  try {
-    db.exec(sql);
-  } catch (e) {
-    // Column already exists — ignore
-  }
+  try { db.exec(sql); } catch (e) {}
 });
 
 module.exports = db;
