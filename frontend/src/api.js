@@ -4,6 +4,9 @@ const API = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'https://mailflow-production-db59.up.railway.app'
 });
 
+// PIN verification
+export const verifyPin = (pin) => API.post('/api/verify-pin', { pin });
+
 // Accounts
 export const getAccounts = () => API.get('/api/accounts');
 export const getAuthUrl = () => API.get('/api/accounts/auth');
