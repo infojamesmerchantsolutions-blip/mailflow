@@ -6,6 +6,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// PIN verification endpoint
+app.post('/api/verify-pin', (req, res) => {
+  const { pin } = req.body;
+  const correctPin = process.env.APP_PIN || '1234';
+  if (pin === correctPin) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, error: 'Wrong PIN' });
+  }
+});
+
 // Routes
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/campaigns', require('./routes/campaigns'));
