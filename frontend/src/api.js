@@ -25,6 +25,13 @@ export const pauseCampaign = (id) => API.post(`/api/campaigns/${id}/pause`);
 export const resumeCampaign = (id) => API.post(`/api/campaigns/${id}/resume`);
 export const deleteCampaign = (id) => API.delete(`/api/campaigns/${id}`);
 
+// Templates
+export const getTemplates = () => API.get('/api/templates');
+export const getTemplate = (id) => API.get(`/api/templates/${id}`);
+export const createTemplate = (data) => API.post('/api/templates', data);
+export const updateTemplate = (id, data) => API.put(`/api/templates/${id}`, data);
+export const deleteTemplate = (id) => API.delete(`/api/templates/${id}`);
+
 // Contacts
 export const getContactLists = () => API.get('/api/contacts/lists');
 export const addManualContacts = (data) => API.post('/api/contacts/manual', data);
