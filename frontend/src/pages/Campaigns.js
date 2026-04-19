@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getCampaigns, createCampaign, launchCampaign, pauseCampaign, resumeCampaign, deleteCampaign, getContactLists } from '../api';
+import { getCampaigns, createCampaign, launchCampaign, pauseCampaign, resumeCampaign, deleteCampaign, getContactLists, getTemplates } from '../api';
 
 const s = {
   title: { fontSize: '20px', fontWeight: '500', color: '#111', marginBottom: '4px' },
@@ -15,6 +15,7 @@ const s = {
   input: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none' },
   select: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
   row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
+  row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' },
   variationCard: { border: '0.5px solid #e0e0d8', borderRadius: '10px', padding: '14px', marginBottom: '12px', background: '#fafaf8' },
   variationHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' },
   variationTitle: { fontSize: '13px', fontWeight: '500', color: '#111' },
@@ -51,8 +52,10 @@ const s = {
   footerBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' },
   addVariationBtn: { padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: '1.5px dashed #ccc', background: '#fff', cursor: 'pointer', width: '100%', color: '#666', marginBottom: '12px' },
   removeBtn: { fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '0.5px solid #f7c1c1', background: '#fff', color: '#A32D2D', cursor: 'pointer' },
-  countInput: { width: '80px', fontSize: '13px', padding: '7px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none', textAlign: 'center' },
   variantBadge: { display: 'inline-block', fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '999px', background: '#e6f1fb', color: '#185FA5', marginRight: '8px' },
+  templatePickRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' },
+  templatePickSelect: { flex: 1, fontSize: '13px', padding: '7px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
+  templatePickBtn: { padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: 'none', background: '#534AB7', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' },
 };
 
 const speedOptions = [
@@ -65,19 +68,19 @@ const speedOptions = [
 
 const defaultHtml = `<h2 style="color:#111;">Hello there!</h2>
 <p>This is your email content. You can use HTML to style it.</p>
-<p>Add images, buttons, links and more.</p>
 <a href="https://yoursite.com" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;border-radius:6px;text-decoration:none;">Click here</a>
 <p style="color:#888;font-size:12px;margin-top:24px;">To unsubscribe, reply to this email.</p>`;
 
 const emptyVariation = () => ({
-  id: Date.now(),
+  id: Date.now() + Math.random(),
   subject: '',
   body_html: defaultHtml,
   body_plain: 'Hello there!\n\nThis is your email content.\n\nTo unsubscribe, reply to this email.',
 });
 
-function VariationEditor({ variation, index, onChange, onRemove, showRemove }) {
+function VariationEditor({ variation, index, onChange, onRemove, showRemove, templates }) {
   const previewRef = useRef(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
 
   useEffect(() => {
     if (previewRef.current) {
@@ -90,20 +93,44 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove }) {
     }
   }, [variation.body_html]);
 
+  const applyTemplate = () => {
+    if (!selectedTemplate) return;
+    const t = templates.find(t => t.id === parseInt(selectedTemplate));
+    if (!t) return;
+    onChange({ ...variation, subject: t.subject, body_html: t.body_html, body_plain: t.body_plain });
+    setSelectedTemplate('');
+  };
+
   return (
     <div style={s.variationCard}>
       <div style={s.variationHeader}>
         <div>
           <span style={s.variantBadge}>Variation {index + 1}</span>
-          <span style={{ fontSize: '12px', color: '#888' }}>Randomly selected when sending</span>
+          <span style={{ fontSize: '12px', color: '#888' }}>randomly picked per recipient</span>
         </div>
         {showRemove && <button style={s.removeBtn} onClick={onRemove}>Remove</button>}
       </div>
 
+      {templates.length > 0 && (
+        <div style={s.templatePickRow}>
+          <select
+            style={s.templatePickSelect}
+            value={selectedTemplate}
+            onChange={e => setSelectedTemplate(e.target.value)}
+          >
+            <option value="">Load from saved template...</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name} — {t.subject}</option>
+            ))}
+          </select>
+          <button style={s.templatePickBtn} onClick={applyTemplate}>Apply template</button>
+        </div>
+      )}
+
       <div style={s.label}>Subject line</div>
       <input
         style={s.input}
-        placeholder={`e.g. Subject line variation ${index + 1}`}
+        placeholder={`e.g. Subject variation ${index + 1}`}
         value={variation.subject}
         onChange={e => onChange({ ...variation, subject: e.target.value })}
       />
@@ -144,6 +171,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove }) {
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [lists, setLists] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
@@ -157,9 +185,10 @@ export default function Campaigns() {
 
   const load = async () => {
     try {
-      const [c, l] = await Promise.all([getCampaigns(), getContactLists()]);
+      const [c, l, t] = await Promise.all([getCampaigns(), getContactLists(), getTemplates()]);
       setCampaigns(c.data);
       setLists(l.data);
+      setTemplates(t.data);
     } catch (e) { console.error(e); }
   };
 
@@ -227,7 +256,7 @@ export default function Campaigns() {
     try {
       const res = await createCampaign(buildPayload());
       await launchCampaign(res.data.id);
-      showMsg('Campaign launched! Emails are now being sent randomly across all variations.');
+      showMsg('Campaign launched! Emails are now being sent.');
       resetForm();
       load();
     } catch (e) { showErr(e.response?.data?.error || 'Error launching campaign'); }
@@ -265,8 +294,8 @@ export default function Campaigns() {
     if (!list) return null;
     const totalSeconds = list.count * speed;
     const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    return hours > 0 ? `~${hours}h ${minutes}m` : `~${minutes} minutes`;
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    return hours > 0 ? `~${hours}h ${mins}m` : `~${mins} minutes`;
   };
 
   return (
@@ -304,13 +333,14 @@ export default function Campaigns() {
 
           <hr style={s.divider} />
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={s.cardTitle}>Email content variations</div>
             <div style={{ fontSize: '12px', color: '#888' }}>{variations.length} variation{variations.length > 1 ? 's' : ''} · randomly distributed</div>
           </div>
 
           <div style={s.infoBox}>
-            Add multiple subject lines and email bodies. The system will randomly pick one for each recipient — this helps avoid spam filters when sending to large lists.
+            Add multiple variations — the system randomly picks one per recipient to avoid spam filters.
+            You can load from your saved templates or write from scratch.
           </div>
 
           {variations.map((v, i) => (
@@ -321,6 +351,7 @@ export default function Campaigns() {
               onChange={(updated) => updateVariation(i, updated)}
               onRemove={() => removeVariation(i)}
               showRemove={variations.length > 1}
+              templates={templates}
             />
           ))}
 
@@ -397,7 +428,10 @@ export default function Campaigns() {
               <div style={s.campSub}>
                 {c.contact_list} · {c.delay_seconds}s delay · {c.sent_count}/{c.total_contacts} sent
                 {c.failed_count > 0 && <span style={{ color: '#A32D2D' }}> · {c.failed_count} failed</span>}
-                {c.content_variations && (() => { try { return ` · ${JSON.parse(c.content_variations).length} variations`; } catch(e) { return ''; } })()}
+                {c.content_variations && (() => {
+                  try { return ` · ${JSON.parse(c.content_variations).length} variations`; }
+                  catch (e) { return ''; }
+                })()}
               </div>
               <div style={s.progressBar}>
                 <div style={{ ...s.progressFill, width: `${getPct(c)}%` }} />
