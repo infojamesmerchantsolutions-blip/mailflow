@@ -22,6 +22,7 @@ app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/queue', require('./routes/queue'));
+app.use('/api/templates', require('./routes/templates'));
 
 // Start scheduler
 require('./scheduler');
