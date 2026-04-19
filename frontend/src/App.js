@@ -4,6 +4,7 @@ import Campaigns from './pages/Campaigns';
 import Contacts from './pages/Contacts';
 import Accounts from './pages/Accounts';
 import Logs from './pages/Logs';
+import Templates from './pages/Templates';
 import PinModal from './components/PinModal';
 
 const styles = {
@@ -26,7 +27,8 @@ const styles = {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', color: '#3B6D11', protected: false },
   { id: 'campaigns', label: 'Campaigns', color: '#185FA5', protected: true },
-  { id: 'contacts', label: 'Contacts', color: '#534AB7', protected: true },
+  { id: 'templates', label: 'Templates', color: '#534AB7', protected: true },
+  { id: 'contacts', label: 'Contacts', color: '#D85A30', protected: true },
   { id: 'accounts', label: 'Gmail Accounts', color: '#854F0B', protected: true },
   { id: 'logs', label: 'Logs', color: '#888', protected: false },
 ];
@@ -82,6 +84,7 @@ export default function App() {
     switch (page) {
       case 'dashboard': return <Dashboard />;
       case 'campaigns': return <Campaigns requirePin={requirePin} />;
+      case 'templates': return <Templates requirePin={requirePin} />;
       case 'contacts': return <Contacts requirePin={requirePin} />;
       case 'accounts': return <Accounts requirePin={requirePin} />;
       case 'logs': return <Logs />;
@@ -130,7 +133,7 @@ export default function App() {
               style={{ fontSize: '11px', color: '#3B6D11', marginTop: '6px', cursor: 'pointer' }}
               onClick={() => { setPinVerified(false); setPage('dashboard'); }}
             >
-              🔓 Unlock active · Lock
+              🔓 Unlocked · Click to lock
             </div>
           )}
         </div>
