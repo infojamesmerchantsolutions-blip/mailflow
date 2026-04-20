@@ -1,7 +1,14 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'mailflow.db'));
+// Use persistent volume if available, otherwise fallback to local
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const db = new Database(path.join(dataDir, 'mailflow.db'));
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS accounts (
