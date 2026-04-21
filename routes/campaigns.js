@@ -25,8 +25,21 @@ router.post('/', (req, res) => {
   try {
     const {
       name, subject, body_html, body_plain,
-      contact_list, delay_seconds, start_time, end_time, schedule_type
+      contact_list, delay_seconds, start_time, end_time,
+      schedule_type, content_variations, content_mode
     } = req.body;
+
+    let parsedVariations = [];
+    try {
+      parsedVariations = JSON.parse(content_variations || '[]');
+    } catch (e) {
+      parsedVariations = [];
+    }
+
+    console.log(`Creating campaign with ${parsedVariations.length} variations`);
+    parsedVariations.forEach((v, i) => {
+      console.log(`Variation ${i + 1}: ${v.subject}`);
+    });
 
     const contacts = db.prepare(
       'SELECT COUNT(*) as count FROM contacts WHERE list_name = ?'
@@ -34,13 +47,22 @@ router.post('/', (req, res) => {
 
     const result = db.prepare(`
       INSERT INTO campaigns 
-        (name, subject, body_html, body_plain, contact_list, delay_seconds, start_time, end_time, total_contacts, schedule_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (name, subject, body_html, body_plain, contact_list, delay_seconds, 
+         start_time, end_time, total_contacts, schedule_type, content_variations, content_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      name, subject, body_html, body_plain,
-      contact_list, delay_seconds || 30,
-      start_time || '00:00', end_time || '23:59',
-      contacts.count, schedule_type || 'immediate'
+      name,
+      subject || (parsedVariations[0]?.subject || ''),
+      body_html || (parsedVariations[0]?.body_html || ''),
+      body_plain || (parsedVariations[0]?.body_plain || ''),
+      contact_list,
+      delay_seconds || 30,
+      start_time || '00:00',
+      end_time || '23:59',
+      contacts.count,
+      schedule_type || 'immediate',
+      JSON.stringify(parsedVariations),
+      content_mode || 'random'
     );
 
     res.json({ id: result.lastInsertRowid, success: true });
@@ -53,6 +75,12 @@ router.post('/:id/launch', (req, res) => {
   try {
     const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+    try {
+      const vars = JSON.parse(campaign.content_variations || '[]');
+      console.log(`Launching campaign "${campaign.name}" with ${vars.length} variations:`);
+      vars.forEach((v, i) => console.log(`  Variation ${i + 1}: ${v.subject}`));
+    } catch (e) {}
 
     const contacts = db.prepare(
       'SELECT email FROM contacts WHERE list_name = ?'
@@ -70,7 +98,6 @@ router.post('/:id/launch', (req, res) => {
       return res.status(400).json({ error: 'No active Gmail accounts connected' });
     }
 
-    // Clear any existing queue for this campaign
     db.prepare("DELETE FROM queue WHERE campaign_id = ? AND status = 'pending'").run(campaign.id);
 
     const insertQueue = db.prepare(`
