@@ -59,16 +59,34 @@ function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain) {
 }
 
 function pickRandomContent(campaign) {
-  if (campaign.content_variations) {
-    try {
+  try {
+    if (campaign.content_variations) {
       const variations = JSON.parse(campaign.content_variations);
-      if (variations && variations.length > 0) {
+      if (Array.isArray(variations) && variations.length > 1) {
         const pick = variations[Math.floor(Math.random() * variations.length)];
-        return { subject: pick.subject, body_html: pick.body_html, body_plain: pick.body_plain };
+        console.log(`Picked variation: ${pick.subject}`);
+        return {
+          subject: pick.subject,
+          body_html: pick.body_html,
+          body_plain: pick.body_plain
+        };
       }
-    } catch (e) {}
+      if (Array.isArray(variations) && variations.length === 1) {
+        return {
+          subject: variations[0].subject,
+          body_html: variations[0].body_html,
+          body_plain: variations[0].body_plain
+        };
+      }
+    }
+  } catch (e) {
+    console.error('Error parsing content variations:', e.message);
   }
-  return { subject: campaign.subject, body_html: campaign.body_html, body_plain: campaign.body_plain };
+  return {
+    subject: campaign.subject,
+    body_html: campaign.body_html,
+    body_plain: campaign.body_plain
+  };
 }
 
 function pickDifferentAccount(currentAccountId) {
@@ -90,7 +108,6 @@ function isWithinWindow(startTime, endTime) {
 }
 
 async function processCampaign(campaign) {
-  // Check time window
   if (campaign.schedule_type === 'window') {
     if (!isWithinWindow(campaign.start_time, campaign.end_time)) {
       console.log(`Campaign "${campaign.name}" outside sending window — skipping`);
@@ -98,16 +115,14 @@ async function processCampaign(campaign) {
     }
   }
 
-  // Check if enough time has passed since last send for this campaign
   const now = Date.now();
   const last = lastSentTime[campaign.id] || 0;
   const delayMs = campaign.delay_seconds * 1000;
 
   if (now - last < delayMs) {
-    return; // Not time yet
+    return;
   }
 
-  // Get next pending item
   const queueItem = db.prepare(`
     SELECT q.*,
       a.email as account_email,
@@ -126,7 +141,6 @@ async function processCampaign(campaign) {
   `).get(campaign.id);
 
   if (!queueItem) {
-    // Check if there are pending items with no active account
     const anyPending = db.prepare(`
       SELECT COUNT(*) as count FROM queue
       WHERE campaign_id = ? AND status = 'pending'
@@ -139,13 +153,12 @@ async function processCampaign(campaign) {
     return;
   }
 
-  // Mark time immediately so delay starts from now
   lastSentTime[campaign.id] = now;
 
   const content = pickRandomContent(campaign);
 
   try {
-    console.log(`[${new Date().toISOString()}] Sending to ${queueItem.recipient_email} via ${queueItem.account_email}`);
+    console.log(`[${new Date().toISOString()}] Sending to ${queueItem.recipient_email} via ${queueItem.account_email} | Subject: ${content.subject}`);
 
     const auth = await getAuthForAccount({
       id: queueItem.acc_id,
@@ -166,7 +179,6 @@ async function processCampaign(campaign) {
 
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
 
-    // Success
     db.prepare(`
       UPDATE queue SET status = 'sent', sent_at = datetime('now') WHERE id = ?
     `).run(queueItem.id);
@@ -174,8 +186,8 @@ async function processCampaign(campaign) {
     db.prepare(`UPDATE accounts SET daily_sent = daily_sent + 1 WHERE id = ?`).run(queueItem.acc_id);
     db.prepare(`
       INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-      VALUES (?, ?, ?, 'sent', 'Email sent successfully', ?)
-    `).run(campaign.id, queueItem.acc_id, queueItem.recipient_email, queueItem.retry_count || 0);
+      VALUES (?, ?, ?, 'sent', ?, ?)
+    `).run(campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0);
 
     console.log(`✓ Sent to ${queueItem.recipient_email}`);
 
@@ -185,7 +197,6 @@ async function processCampaign(campaign) {
     const retryCount = (queueItem.retry_count || 0) + 1;
 
     if (retryCount < MAX_RETRIES) {
-      // Pick a different account for retry
       const newAccount = pickDifferentAccount(queueItem.acc_id);
       const newAccountId = newAccount ? newAccount.id : queueItem.acc_id;
 
@@ -202,7 +213,6 @@ async function processCampaign(campaign) {
 
       console.log(`↻ Retrying ${queueItem.recipient_email} (attempt ${retryCount}/${MAX_RETRIES})`);
     } else {
-      // Max retries reached — mark as failed
       db.prepare(`
         UPDATE queue SET status = 'failed', error = ?, retry_count = ? WHERE id = ?
       `).run(err.message, retryCount, queueItem.id);
@@ -221,8 +231,6 @@ async function processAllCampaigns() {
   try {
     const runningCampaigns = db.prepare("SELECT * FROM campaigns WHERE status = 'running'").all();
     if (runningCampaigns.length === 0) return;
-
-    // Process all campaigns in parallel
     await Promise.all(runningCampaigns.map(campaign => processCampaign(campaign)));
   } catch (err) {
     console.error('Scheduler error:', err.message);
