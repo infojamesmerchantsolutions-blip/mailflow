@@ -219,19 +219,34 @@ export default function Campaigns() {
     return true;
   };
 
-  const buildPayload = () => ({
+  const compressHtml = (html) => {
+  if (!html) return '';
+  return html
+    .replace(/\s+/g, ' ')
+    .replace(/>\s+</g, '><')
+    .trim();
+};
+
+const buildPayload = () => {
+  const compressedVariations = variations.map(v => ({
+    ...v,
+    body_html: compressHtml(v.body_html),
+  }));
+
+  return {
     name: form.name,
-    subject: variations[0].subject,
-    body_html: variations[0].body_html,
-    body_plain: variations[0].body_plain,
+    subject: compressedVariations[0].subject,
+    body_html: compressedVariations[0].body_html,
+    body_plain: compressedVariations[0].body_plain,
     contact_list: form.contact_list,
     delay_seconds: speed,
     schedule_type: scheduleType,
     start_time: scheduleType === 'immediate' ? '00:00' : form.start_time,
     end_time: scheduleType === 'immediate' ? '23:59' : form.end_time,
-    content_variations: JSON.stringify(variations),
+    content_variations: JSON.stringify(compressedVariations),
     content_mode: 'random',
-  });
+  };
+};
 
   const resetForm = () => {
     setShowForm(false);
