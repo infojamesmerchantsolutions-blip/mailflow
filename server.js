@@ -7,8 +7,8 @@ const app = express();
 app.use(cors());
 
 // Increase payload limit to handle large email templates
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // PIN verification endpoint
 app.post('/api/verify-pin', (req, res) => {
