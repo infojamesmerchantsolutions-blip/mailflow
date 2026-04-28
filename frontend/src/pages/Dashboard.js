@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { getStats, getQueue, getCampaigns } from '../api';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://mailflow-production-db59.up.railway.app';
 
 const s = {
   title: { fontSize: '20px', fontWeight: '500', color: '#111', marginBottom: '4px' },
@@ -13,7 +15,6 @@ const s = {
   card: { background: '#fff', border: '0.5px solid #e0e0d8', borderRadius: '12px', padding: '14px 16px' },
   cardTitle: { fontSize: '13px', fontWeight: '500', color: '#111', marginBottom: '12px' },
   queueItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0', borderBottom: '0.5px solid #e0e0d8', fontSize: '12px' },
-  pulse: { width: '7px', height: '7px', borderRadius: '50%', background: '#3B6D11', flexShrink: 0 },
   campItem: { padding: '8px 0', borderBottom: '0.5px solid #e0e0d8' },
   campName: { fontSize: '13px', color: '#111', marginBottom: '4px' },
   campSub: { fontSize: '11px', color: '#888' },
@@ -21,29 +22,64 @@ const s = {
   progressFill: { height: '100%', borderRadius: '2px', background: '#185FA5' },
   pill: { fontSize: '10px', fontWeight: '500', padding: '2px 8px', borderRadius: '999px', background: '#e6f1fb', color: '#185FA5' },
   topbar: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' },
+  offlineBanner: { background: '#fcebeb', border: '0.5px solid #f7c1c1', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#A32D2D', marginBottom: '16px' },
+  onlineBanner: { background: '#eaf3de', border: '0.5px solid #c0dd97', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#3B6D11', marginBottom: '16px' },
 };
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({});
-  const [queue, setQueue] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
+  const [data, setData] = useState({ stats: {}, campaigns: [], queue: [] });
+  const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const [s, q, c] = await Promise.all([getStats(), getQueue(), getCampaigns()]);
-      setStats(s.data);
-      setQueue(q.data.slice(0, 5));
-      setCampaigns(c.data.filter(c => c.status === 'running').slice(0, 3));
+      const res = await axios.get(`${BASE_URL}/api/dashboard`, { timeout: 10000 });
+      setData(res.data);
+      setOffline(false);
+      setLoading(false);
     } catch (err) {
-      console.error(err);
+      if (!navigator.onLine) {
+        setOffline(true);
+      } else {
+        // Retry once after 3 seconds
+        setRetrying(true);
+        setTimeout(async () => {
+          try {
+            const res = await axios.get(`${BASE_URL}/api/dashboard`, { timeout: 10000 });
+            setData(res.data);
+            setOffline(false);
+          } catch (e) {
+            setOffline(true);
+          }
+          setRetrying(false);
+          setLoading(false);
+        }, 3000);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    const interval = setInterval(load, 8000);
+
+    window.addEventListener('online', () => { setOffline(false); load(); });
+    window.addEventListener('offline', () => setOffline(true));
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', load);
+      window.removeEventListener('offline', () => setOffline(true));
+    };
+  }, [load]);
+
+  const { stats, campaigns, queue } = data;
+  const runningCampaigns = (campaigns || []).filter(c => c.status === 'running');
+
+  const getStatusDot = (status) => {
+    const colors = { sent: '#3B6D11', failed: '#A32D2D', pending: '#854F0B', retrying: '#185FA5' };
+    return <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: colors[status] || '#ccc', flexShrink: 0 }} />;
+  };
 
   return (
     <div>
@@ -52,67 +88,91 @@ export default function Dashboard() {
           <div style={s.title}>Dashboard</div>
           <div style={s.sub}>Live overview of all sending activity</div>
         </div>
+        <button
+          onClick={load}
+          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', cursor: 'pointer' }}
+        >
+          {retrying ? 'Retrying...' : '↻ Refresh'}
+        </button>
       </div>
 
-      <div style={s.statsGrid}>
-        <div style={s.statCard}>
-          <div style={s.statLabel}>Sent today</div>
-          <div style={s.statNum}>{stats.today_sent || 0}</div>
-          <div style={s.statSub}>across {stats.active_accounts || 0} accounts</div>
+      {offline && (
+        <div style={s.offlineBanner}>
+          ⚠️ You appear to be offline or the server is unreachable. Data shown may be outdated.
         </div>
-        <div style={s.statCard}>
-          <div style={s.statLabel}>In queue</div>
-          <div style={s.statNum}>{stats.pending || 0}</div>
-          <div style={s.statSub}>pending emails</div>
-        </div>
-        <div style={s.statCard}>
-          <div style={s.statLabel}>Active campaigns</div>
-          <div style={s.statNum}>{stats.active_campaigns || 0}</div>
-          <div style={s.statSub}>running now</div>
-        </div>
-        <div style={s.statCard}>
-          <div style={s.statLabel}>Failed</div>
-          <div style={s.statNum}>{stats.failed || 0}</div>
-          <div style={s.statSub}>total failed sends</div>
-        </div>
-      </div>
+      )}
 
-      <div style={s.row}>
-        <div style={s.card}>
-          <div style={s.cardTitle}>Active campaigns</div>
-          {campaigns.length === 0 && <div style={{ fontSize: '13px', color: '#888' }}>No running campaigns</div>}
-          {campaigns.map(c => {
-            const pct = c.total_contacts > 0 ? Math.round((c.sent_count / c.total_contacts) * 100) : 0;
-            return (
-              <div key={c.id} style={s.campItem}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={s.campName}>{c.name}</div>
-                  <span style={s.pill}>{pct}%</span>
-                </div>
-                <div style={s.campSub}>{c.total_contacts} contacts · {c.delay_seconds}s delay</div>
-                <div style={s.progressBar}>
-                  <div style={{ ...s.progressFill, width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#888', fontSize: '14px' }}>
+          Loading dashboard...
         </div>
-
-        <div style={s.card}>
-          <div style={s.cardTitle}>Live send queue</div>
-          {queue.length === 0 && <div style={{ fontSize: '13px', color: '#888' }}>No recent activity</div>}
-          {queue.map(item => (
-            <div key={item.id} style={s.queueItem}>
-              <div style={{ ...s.pulse, background: item.status === 'sent' ? '#3B6D11' : item.status === 'failed' ? '#A32D2D' : '#854F0B' }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ color: '#111' }}>{item.recipient_email}</div>
-                <div style={{ color: '#888', fontSize: '11px' }}>via {item.account_email}</div>
-              </div>
-              <div style={{ fontSize: '11px', color: '#888' }}>{item.status}</div>
+      ) : (
+        <>
+          <div style={s.statsGrid}>
+            <div style={s.statCard}>
+              <div style={s.statLabel}>Sent today</div>
+              <div style={s.statNum}>{stats.today_sent || 0}</div>
+              <div style={s.statSub}>across {stats.active_accounts || 0} accounts</div>
             </div>
-          ))}
-        </div>
-      </div>
+            <div style={s.statCard}>
+              <div style={s.statLabel}>In queue</div>
+              <div style={s.statNum}>{stats.pending || 0}</div>
+              <div style={s.statSub}>pending emails</div>
+            </div>
+            <div style={s.statCard}>
+              <div style={s.statLabel}>Active campaigns</div>
+              <div style={s.statNum}>{stats.active_campaigns || 0}</div>
+              <div style={s.statSub}>running now</div>
+            </div>
+            <div style={s.statCard}>
+              <div style={s.statLabel}>Failed</div>
+              <div style={s.statNum}>{stats.failed || 0}</div>
+              <div style={s.statSub}>total failed sends</div>
+            </div>
+          </div>
+
+          <div style={s.row}>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Active campaigns</div>
+              {runningCampaigns.length === 0 && (
+                <div style={{ fontSize: '13px', color: '#888' }}>No running campaigns</div>
+              )}
+              {runningCampaigns.map(c => {
+                const pct = c.total_contacts > 0 ? Math.round((c.sent_count / c.total_contacts) * 100) : 0;
+                return (
+                  <div key={c.id} style={s.campItem}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={s.campName}>{c.name}</div>
+                      <span style={s.pill}>{pct}%</span>
+                    </div>
+                    <div style={s.campSub}>{c.total_contacts} contacts · {c.delay_seconds}s delay</div>
+                    <div style={s.progressBar}>
+                      <div style={{ ...s.progressFill, width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={s.card}>
+              <div style={s.cardTitle}>Live send queue</div>
+              {(queue || []).length === 0 && (
+                <div style={{ fontSize: '13px', color: '#888' }}>No recent activity</div>
+              )}
+              {(queue || []).map(item => (
+                <div key={item.id} style={s.queueItem}>
+                  {getStatusDot(item.status)}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#111' }}>{item.recipient_email}</div>
+                    <div style={{ color: '#888', fontSize: '11px' }}>via {item.account_email}</div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>{item.status}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
