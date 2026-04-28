@@ -53,10 +53,15 @@ function TemplateEditor({ template, onSave, onCancel, isEditing }) {
     }
   }, [bodyHtml]);
 
-  const handleSave = () => {
-    if (!name || !subject) return alert('Please enter a name and subject');
-    onSave({ name, subject, body_html: bodyHtml, body_plain: bodyPlain });
-  };
+  const compressHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
+};
+
+const handleSave = () => {
+  if (!name || !subject) return alert('Please enter a name and subject');
+  onSave({ name, subject, body_html: compressHtml(bodyHtml), body_plain: bodyPlain });
+};
 
   return (
     <div style={s.card}>
