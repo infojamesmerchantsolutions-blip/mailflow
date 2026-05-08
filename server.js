@@ -67,3 +67,18 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`MailFlow server running on port ${PORT}`);
 });
+
+// Keep-alive ping every 5 minutes to prevent Render from sleeping
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://mailflow-ndex.onrender.com';
+setInterval(async () => {
+  try {
+    const https = require('https');
+    https.get(`${RENDER_URL}/api/queue/stats`, (res) => {
+      console.log(`Keep-alive ping sent — status: ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.log(`Keep-alive ping failed: ${err.message}`);
+    });
+  } catch (err) {
+    console.log(`Keep-alive error: ${err.message}`);
+  }
+}, 5 * 60 * 1000); // every 5 minutes
