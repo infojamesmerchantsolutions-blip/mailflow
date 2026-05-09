@@ -7,59 +7,60 @@ const fs = require('fs');
 
 const upload = multer({ dest: 'uploads/' });
 
-router.get('/lists', (req, res) => {
+router.get('/lists', async (req, res) => {
   try {
-    const lists = db.prepare(`
+    const lists = await db.all(`
       SELECT list_name, COUNT(*) as count, MAX(created_at) as created_at
       FROM contacts
       GROUP BY list_name
-      ORDER BY created_at DESC
-    `).all();
+      ORDER BY MAX(created_at) DESC
+    `);
     res.json(lists);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get('/lists/:name', (req, res) => {
+router.get('/lists/:name', async (req, res) => {
   try {
-    const contacts = db.prepare(
-      'SELECT * FROM contacts WHERE list_name = ? ORDER BY created_at DESC'
-    ).all(req.params.name);
+    const contacts = await db.all(
+      'SELECT * FROM contacts WHERE list_name = $1 ORDER BY created_at DESC',
+      [req.params.name]
+    );
     res.json(contacts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/manual', (req, res) => {
+router.post('/manual', async (req, res) => {
   try {
     const { list_name, emails } = req.body;
-
     if (!list_name || !emails || emails.length === 0) {
       return res.status(400).json({ error: 'List name and emails are required' });
     }
 
-    const insert = db.prepare(
-      'INSERT OR IGNORE INTO contacts (list_name, email) VALUES (?, ?)'
-    );
+    let added = 0;
+    for (const email of emails) {
+      const clean = email.trim().toLowerCase();
+      if (clean) {
+        try {
+          await db.run(
+            'INSERT INTO contacts (list_name, email) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [list_name, clean]
+          );
+          added++;
+        } catch (e) {}
+      }
+    }
 
-    const insertMany = db.transaction(() => {
-      emails.forEach(email => {
-        const clean = email.trim().toLowerCase();
-        if (clean) insert.run(list_name, clean);
-      });
-    });
-
-    insertMany();
-
-    res.json({ success: true, added: emails.length });
+    res.json({ success: true, added });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/upload', upload.single('file'), (req, res) => {
+router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const { list_name } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -75,19 +76,19 @@ router.post('/upload', upload.single('file'), (req, res) => {
           emails.push(email.trim().toLowerCase());
         }
       })
-      .on('end', () => {
-        const insert = db.prepare(
-          'INSERT OR IGNORE INTO contacts (list_name, email) VALUES (?, ?)'
-        );
-
-        const insertMany = db.transaction(() => {
-          emails.forEach(email => insert.run(list_name, email));
-        });
-
-        insertMany();
+      .on('end', async () => {
+        let added = 0;
+        for (const email of emails) {
+          try {
+            await db.run(
+              'INSERT INTO contacts (list_name, email) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [list_name, email]
+            );
+            added++;
+          } catch (e) {}
+        }
         fs.unlinkSync(filePath);
-
-        res.json({ success: true, added: emails.length });
+        res.json({ success: true, added });
       })
       .on('error', (err) => {
         res.status(500).json({ error: err.message });
@@ -97,9 +98,9 @@ router.post('/upload', upload.single('file'), (req, res) => {
   }
 });
 
-router.delete('/lists/:name', (req, res) => {
+router.delete('/lists/:name', async (req, res) => {
   try {
-    db.prepare('DELETE FROM contacts WHERE list_name = ?').run(req.params.name);
+    await db.run('DELETE FROM contacts WHERE list_name = $1', [req.params.name]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
