@@ -20,8 +20,10 @@ async function getAuthForAccount(account) {
 
   if (Date.now() > account.token_expiry) {
     const { credentials } = await accountClient.refreshAccessToken();
-    db.prepare(`UPDATE accounts SET access_token = ?, token_expiry = ? WHERE id = ?`)
-      .run(credentials.access_token, credentials.expiry_date, account.id);
+    await db.run(
+      'UPDATE accounts SET access_token = $1, token_expiry = $2 WHERE id = $3',
+      [credentials.access_token, credentials.expiry_date, account.id]
+    );
     accountClient.setCredentials(credentials);
   }
 
@@ -89,12 +91,13 @@ function pickRandomContent(campaign) {
   };
 }
 
-function pickDifferentAccount(currentAccountId) {
-  const accounts = db.prepare(`
-    SELECT * FROM accounts WHERE status = 'active' AND id != ?
-  `).all(currentAccountId);
+async function pickDifferentAccount(currentAccountId) {
+  const accounts = await db.all(
+    "SELECT * FROM accounts WHERE status = 'active' AND id != $1",
+    [currentAccountId]
+  );
   if (accounts.length === 0) {
-    return db.prepare(`SELECT * FROM accounts WHERE status = 'active' LIMIT 1`).get();
+    return await db.get("SELECT * FROM accounts WHERE status = 'active' LIMIT 1");
   }
   return accounts[Math.floor(Math.random() * accounts.length)];
 }
@@ -110,7 +113,6 @@ function isWithinWindow(startTime, endTime) {
 async function processCampaign(campaign) {
   if (campaign.schedule_type === 'window') {
     if (!isWithinWindow(campaign.start_time, campaign.end_time)) {
-      console.log(`Campaign "${campaign.name}" outside sending window — skipping`);
       return;
     }
   }
@@ -119,11 +121,9 @@ async function processCampaign(campaign) {
   const last = lastSentTime[campaign.id] || 0;
   const delayMs = campaign.delay_seconds * 1000;
 
-  if (now - last < delayMs) {
-    return;
-  }
+  if (now - last < delayMs) return;
 
-  const queueItem = db.prepare(`
+  const queueItem = await db.get(`
     SELECT q.*,
       a.email as account_email,
       a.display_name as account_display_name,
@@ -133,28 +133,26 @@ async function processCampaign(campaign) {
       a.id as acc_id
     FROM queue q
     JOIN accounts a ON q.account_id = a.id
-    WHERE q.campaign_id = ?
+    WHERE q.campaign_id = $1
       AND q.status = 'pending'
       AND a.status = 'active'
     ORDER BY q.id ASC
     LIMIT 1
-  `).get(campaign.id);
+  `, [campaign.id]);
 
   if (!queueItem) {
-    const anyPending = db.prepare(`
-      SELECT COUNT(*) as count FROM queue
-      WHERE campaign_id = ? AND status = 'pending'
-    `).get(campaign.id);
-
-    if (anyPending.count === 0) {
-      db.prepare("UPDATE campaigns SET status = 'completed' WHERE id = ?").run(campaign.id);
+    const anyPending = await db.get(
+      "SELECT COUNT(*) as count FROM queue WHERE campaign_id = $1 AND status = 'pending'",
+      [campaign.id]
+    );
+    if (parseInt(anyPending.count) === 0) {
+      await db.run("UPDATE campaigns SET status = 'completed' WHERE id = $1", [campaign.id]);
       console.log(`Campaign "${campaign.name}" completed!`);
     }
     return;
   }
 
   lastSentTime[campaign.id] = now;
-
   const content = pickRandomContent(campaign);
 
   try {
@@ -179,15 +177,23 @@ async function processCampaign(campaign) {
 
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
 
-    db.prepare(`
-      UPDATE queue SET status = 'sent', sent_at = datetime('now') WHERE id = ?
-    `).run(queueItem.id);
-    db.prepare(`UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = ?`).run(campaign.id);
-    db.prepare(`UPDATE accounts SET daily_sent = daily_sent + 1 WHERE id = ?`).run(queueItem.acc_id);
-    db.prepare(`
-      INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-      VALUES (?, ?, ?, 'sent', ?, ?)
-    `).run(campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0);
+    await db.run(
+      "UPDATE queue SET status = 'sent', sent_at = to_char(now(), 'YYYY-MM-DD HH24:MI:SS') WHERE id = $1",
+      [queueItem.id]
+    );
+    await db.run(
+      'UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = $1',
+      [campaign.id]
+    );
+    await db.run(
+      'UPDATE accounts SET daily_sent = daily_sent + 1 WHERE id = $1',
+      [queueItem.acc_id]
+    );
+    await db.run(
+      `INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
+       VALUES ($1, $2, $3, 'sent', $4, $5)`,
+      [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0]
+    );
 
     console.log(`✓ Sent to ${queueItem.recipient_email}`);
 
@@ -197,55 +203,24 @@ async function processCampaign(campaign) {
     const retryCount = (queueItem.retry_count || 0) + 1;
 
     if (retryCount < MAX_RETRIES) {
-      const newAccount = pickDifferentAccount(queueItem.acc_id);
+      const newAccount = await pickDifferentAccount(queueItem.acc_id);
       const newAccountId = newAccount ? newAccount.id : queueItem.acc_id;
 
-      db.prepare(`
-        UPDATE queue
-        SET retry_count = ?, last_error = ?, account_id = ?, status = 'pending'
-        WHERE id = ?
-      `).run(retryCount, err.message, newAccountId, queueItem.id);
-
-      db.prepare(`
-        INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-        VALUES (?, ?, ?, 'retrying', ?, ?)
-      `).run(campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} — retrying with different account`, retryCount);
-
+      await db.run(
+        "UPDATE queue SET retry_count = $1, last_error = $2, account_id = $3, status = 'pending' WHERE id = $4",
+        [retryCount, err.message, newAccountId, queueItem.id]
+      );
+      await db.run(
+        `INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
+         VALUES ($1, $2, $3, 'retrying', $4, $5)`,
+        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} — retrying with different account`, retryCount]
+      );
       console.log(`↻ Retrying ${queueItem.recipient_email} (attempt ${retryCount}/${MAX_RETRIES})`);
     } else {
-      db.prepare(`
-        UPDATE queue SET status = 'failed', error = ?, retry_count = ? WHERE id = ?
-      `).run(err.message, retryCount, queueItem.id);
-      db.prepare(`UPDATE campaigns SET failed_count = failed_count + 1 WHERE id = ?`).run(campaign.id);
-      db.prepare(`
-        INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-        VALUES (?, ?, ?, 'failed', ?, ?)
-      `).run(campaign.id, queueItem.acc_id, queueItem.recipient_email, `Permanently failed after ${MAX_RETRIES} attempts: ${err.message}`, retryCount);
-
-      console.log(`✗ Permanently failed: ${queueItem.recipient_email} after ${MAX_RETRIES} attempts`);
-    }
-  }
-}
-
-async function processAllCampaigns() {
-  try {
-    const runningCampaigns = db.prepare("SELECT * FROM campaigns WHERE status = 'running'").all();
-    if (runningCampaigns.length === 0) return;
-    await Promise.all(runningCampaigns.map(campaign => processCampaign(campaign)));
-  } catch (err) {
-    console.error('Scheduler error:', err.message);
-  }
-}
-
-// Reset daily counts at midnight
-cron.schedule('0 0 * * *', () => {
-  db.prepare("UPDATE accounts SET daily_sent = 0, last_reset = datetime('now')").run();
-  console.log('Daily sent counts reset');
-});
-
-// Tick every 1 second for precise delay handling
-cron.schedule('* * * * * *', async () => {
-  await processAllCampaigns();
-});
-
-console.log('Scheduler started — ticking every second for precise delays');
+      await db.run(
+        "UPDATE queue SET status = 'failed', error = $1, retry_count = $2 WHERE id = $3",
+        [err.message, retryCount, queueItem.id]
+      );
+      await db.run(
+        'UPDATE campaigns SET failed_count = failed_count + 1 WHERE id = $1',
+        [campaign.id]
