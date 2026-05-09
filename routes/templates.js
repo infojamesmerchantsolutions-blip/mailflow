@@ -2,20 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Get all templates
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const templates = db.prepare('SELECT * FROM templates ORDER BY created_at DESC').all();
+    const templates = await db.all('SELECT * FROM templates ORDER BY created_at DESC');
     res.json(templates);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get single template
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const template = db.prepare('SELECT * FROM templates WHERE id = ?').get(req.params.id);
+    const template = await db.get('SELECT * FROM templates WHERE id = $1', [req.params.id]);
     if (!template) return res.status(404).json({ error: 'Template not found' });
     res.json(template);
   } catch (err) {
@@ -23,38 +21,36 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// Create template
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, subject, body_html, body_plain } = req.body;
     if (!name || !subject) return res.status(400).json({ error: 'Name and subject are required' });
-    const result = db.prepare(`
+    const result = await db.run(`
       INSERT INTO templates (name, subject, body_html, body_plain)
-      VALUES (?, ?, ?, ?)
-    `).run(name, subject, body_html, body_plain);
-    res.json({ id: result.lastInsertRowid, success: true });
+      VALUES ($1, $2, $3, $4)
+      RETURNING id
+    `, [name, subject, body_html, body_plain]);
+    res.json({ id: result.rows[0].id, success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update template
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, subject, body_html, body_plain } = req.body;
-    db.prepare(`
-      UPDATE templates SET name = ?, subject = ?, body_html = ?, body_plain = ? WHERE id = ?
-    `).run(name, subject, body_html, body_plain, req.params.id);
+    await db.run(`
+      UPDATE templates SET name = $1, subject = $2, body_html = $3, body_plain = $4 WHERE id = $5
+    `, [name, subject, body_html, body_plain, req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete template
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM templates WHERE id = ?').run(req.params.id);
+    await db.run('DELETE FROM templates WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
