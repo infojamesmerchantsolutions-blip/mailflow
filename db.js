@@ -5,7 +5,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Create all tables
 async function initDB() {
   const client = await pool.connect();
   try {
@@ -91,26 +90,43 @@ async function initDB() {
 
 initDB().catch(console.error);
 
-// Helper to run queries easily
 const db = {
   query: (text, params) => pool.query(text, params),
-  
-  // Mimics SQLite's prepare().get() — returns single row
+
   async get(text, params) {
     const res = await pool.query(text, params);
     return res.rows[0] || null;
   },
 
-  // Mimics SQLite's prepare().all() — returns all rows
   async all(text, params) {
     const res = await pool.query(text, params);
     return res.rows;
   },
 
-  // Mimics SQLite's prepare().run() — returns lastID
   async run(text, params) {
     const res = await pool.query(text, params);
     return res;
+  },
+
+  // Compatibility shim for any old SQLite prepare() calls
+  prepare(text) {
+    return {
+      get: async (...params) => {
+        const flatParams = params.flat();
+        const res = await pool.query(text, flatParams);
+        return res.rows[0] || null;
+      },
+      all: async (...params) => {
+        const flatParams = params.flat();
+        const res = await pool.query(text, flatParams);
+        return res.rows;
+      },
+      run: async (...params) => {
+        const flatParams = params.flat();
+        const res = await pool.query(text, flatParams);
+        return res;
+      }
+    };
   }
 };
 
