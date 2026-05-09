@@ -1,12 +1,9 @@
 require('dotenv').config();
-// Force redeploy v2
 const express = require('express');
 const cors = require('cors');
 const app = express();
 
 app.use(cors());
-
-// Increase payload limit to handle large email templates
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -28,31 +25,30 @@ app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/queue', require('./routes/queue'));
 app.use('/api/templates', require('./routes/templates'));
 
-// Single aggregated dashboard endpoint — reduces multiple requests to one
+// Single aggregated dashboard endpoint
 app.get('/api/dashboard', async (req, res) => {
   try {
     const db = require('./db');
 
     const stats = {
-      total: db.prepare('SELECT COUNT(*) as count FROM queue').get().count,
-      pending: db.prepare("SELECT COUNT(*) as count FROM queue WHERE status = 'pending'").get().count,
-      sent: db.prepare("SELECT COUNT(*) as count FROM queue WHERE status = 'sent'").get().count,
-      failed: db.prepare("SELECT COUNT(*) as count FROM queue WHERE status = 'failed'").get().count,
-      today_sent: db.prepare("SELECT COUNT(*) as count FROM queue WHERE status = 'sent' AND date(sent_at) = date('now')").get().count,
-      active_campaigns: db.prepare("SELECT COUNT(*) as count FROM campaigns WHERE status = 'running'").get().count,
-      active_accounts: db.prepare("SELECT COUNT(*) as count FROM accounts WHERE status = 'active'").get().count,
+      total: parseInt((await db.get('SELECT COUNT(*) as count FROM queue')).count),
+      pending: parseInt((await db.get("SELECT COUNT(*) as count FROM queue WHERE status = 'pending'")).count),
+      sent: parseInt((await db.get("SELECT COUNT(*) as count FROM queue WHERE status = 'sent'")).count),
+      failed: parseInt((await db.get("SELECT COUNT(*) as count FROM queue WHERE status = 'failed'")).count),
+      today_sent: parseInt((await db.get("SELECT COUNT(*) as count FROM queue WHERE status = 'sent' AND DATE(sent_at) = CURRENT_DATE")).count),
+      active_campaigns: parseInt((await db.get("SELECT COUNT(*) as count FROM campaigns WHERE status = 'running'")).count),
+      active_accounts: parseInt((await db.get("SELECT COUNT(*) as count FROM accounts WHERE status = 'active'")).count),
     };
 
-    const campaigns = db.prepare('SELECT * FROM campaigns ORDER BY created_at DESC LIMIT 10').all();
-
-    const queue = db.prepare(`
+    const campaigns = await db.all('SELECT * FROM campaigns ORDER BY created_at DESC LIMIT 10');
+    const queue = await db.all(`
       SELECT q.id, q.recipient_email, q.status, q.sent_at, q.error,
         a.email as account_email, c.name as campaign_name
       FROM queue q
       LEFT JOIN accounts a ON q.account_id = a.id
       LEFT JOIN campaigns c ON q.campaign_id = c.id
       ORDER BY q.id DESC LIMIT 20
-    `).all();
+    `);
 
     res.json({ stats, campaigns, queue });
   } catch (err) {
@@ -81,4 +77,4 @@ setInterval(async () => {
   } catch (err) {
     console.log(`Keep-alive error: ${err.message}`);
   }
-}, 5 * 60 * 1000); // every 5 minutes
+}, 5 * 60 * 1000);
