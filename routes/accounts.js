@@ -34,12 +34,21 @@ router.get('/auth', (req, res) => {
 router.get('/callback', async (req, res) => {
   try {
     const { code } = req.query;
+    if (!code) {
+      return res.status(400).send('<h2>Error: No authorization code received</h2>');
+    }
+
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    const profile = await gmail.users.getProfile({ userId: 'me' });
-    const email = profile.data.emailAddress;
+    // Get email using userinfo instead of gmail profile
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    const email = userInfo.data.email;
+
+    if (!email) {
+      return res.status(400).send('<h2>Error: Could not get email address</h2>');
+    }
 
     const existing = await db.get('SELECT id FROM accounts WHERE email = $1', [email]);
     if (existing) {
@@ -54,6 +63,7 @@ router.get('/callback', async (req, res) => {
       );
     }
 
+    console.log(`Account connected successfully: ${email}`);
     res.send(`
       <html>
         <body style="font-family:sans-serif;text-align:center;padding:60px;">
@@ -65,7 +75,16 @@ router.get('/callback', async (req, res) => {
       </html>
     `);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('OAuth callback error:', err.message);
+    res.status(500).send(`
+      <html>
+        <body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2 style="color:#A32D2D;">Connection failed</h2>
+          <p>Error: ${err.message}</p>
+          <p>Please close this tab and try again.</p>
+        </body>
+      </html>
+    `);
   }
 });
 
