@@ -1,105 +1,117 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-// Use persistent volume if available, otherwise fallback to local
-const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Create all tables
+async function initDB() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        display_name TEXT,
+        access_token TEXT,
+        refresh_token TEXT,
+        token_expiry BIGINT,
+        daily_sent INTEGER DEFAULT 0,
+        last_reset TEXT,
+        status TEXT DEFAULT 'active',
+        created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+      );
+
+      CREATE TABLE IF NOT EXISTS contacts (
+        id SERIAL PRIMARY KEY,
+        list_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+      );
+
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body_html TEXT,
+        body_plain TEXT,
+        contact_list TEXT NOT NULL,
+        delay_seconds INTEGER DEFAULT 30,
+        start_time TEXT DEFAULT '00:00',
+        end_time TEXT DEFAULT '23:59',
+        schedule_type TEXT DEFAULT 'immediate',
+        content_variations TEXT,
+        content_mode TEXT DEFAULT 'random',
+        status TEXT DEFAULT 'draft',
+        total_contacts INTEGER DEFAULT 0,
+        sent_count INTEGER DEFAULT 0,
+        failed_count INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+      );
+
+      CREATE TABLE IF NOT EXISTS templates (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body_html TEXT,
+        body_plain TEXT,
+        created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+      );
+
+      CREATE TABLE IF NOT EXISTS queue (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER NOT NULL,
+        recipient_email TEXT NOT NULL,
+        account_id INTEGER,
+        status TEXT DEFAULT 'pending',
+        retry_count INTEGER DEFAULT 0,
+        last_error TEXT,
+        scheduled_at TEXT,
+        sent_at TEXT,
+        error TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER,
+        account_id INTEGER,
+        recipient_email TEXT,
+        status TEXT,
+        message TEXT,
+        retry_count INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+      );
+    `);
+    console.log('Database initialized successfully');
+  } finally {
+    client.release();
+  }
 }
 
-const db = new Database(path.join(dataDir, 'mailflow.db'));
+initDB().catch(console.error);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS accounts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL UNIQUE,
-    display_name TEXT,
-    access_token TEXT,
-    refresh_token TEXT,
-    token_expiry INTEGER,
-    daily_sent INTEGER DEFAULT 0,
-    last_reset TEXT,
-    status TEXT DEFAULT 'active',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
+// Helper to run queries easily
+const db = {
+  query: (text, params) => pool.query(text, params),
+  
+  // Mimics SQLite's prepare().get() — returns single row
+  async get(text, params) {
+    const res = await pool.query(text, params);
+    return res.rows[0] || null;
+  },
 
-  CREATE TABLE IF NOT EXISTS contacts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    list_name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
+  // Mimics SQLite's prepare().all() — returns all rows
+  async all(text, params) {
+    const res = await pool.query(text, params);
+    return res.rows;
+  },
 
-  CREATE TABLE IF NOT EXISTS campaigns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    body_html TEXT,
-    body_plain TEXT,
-    contact_list TEXT NOT NULL,
-    delay_seconds INTEGER DEFAULT 30,
-    start_time TEXT DEFAULT '00:00',
-    end_time TEXT DEFAULT '23:59',
-    schedule_type TEXT DEFAULT 'immediate',
-    content_variations TEXT,
-    content_mode TEXT DEFAULT 'random',
-    status TEXT DEFAULT 'draft',
-    total_contacts INTEGER DEFAULT 0,
-    sent_count INTEGER DEFAULT 0,
-    failed_count INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS templates (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    body_html TEXT,
-    body_plain TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS queue (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    campaign_id INTEGER NOT NULL,
-    recipient_email TEXT NOT NULL,
-    account_id INTEGER,
-    status TEXT DEFAULT 'pending',
-    retry_count INTEGER DEFAULT 0,
-    last_error TEXT,
-    scheduled_at TEXT,
-    sent_at TEXT,
-    error TEXT,
-    FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
-    FOREIGN KEY (account_id) REFERENCES accounts(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    campaign_id INTEGER,
-    account_id INTEGER,
-    recipient_email TEXT,
-    status TEXT,
-    message TEXT,
-    retry_count INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// Migrations
-const migrations = [
-  `ALTER TABLE campaigns ADD COLUMN schedule_type TEXT DEFAULT 'immediate'`,
-  `ALTER TABLE campaigns ADD COLUMN content_variations TEXT`,
-  `ALTER TABLE campaigns ADD COLUMN content_mode TEXT DEFAULT 'random'`,
-  `ALTER TABLE accounts ADD COLUMN display_name TEXT`,
-  `ALTER TABLE queue ADD COLUMN retry_count INTEGER DEFAULT 0`,
-  `ALTER TABLE queue ADD COLUMN last_error TEXT`,
-  `ALTER TABLE logs ADD COLUMN retry_count INTEGER DEFAULT 0`,
-];
-
-migrations.forEach(sql => {
-  try { db.exec(sql); } catch (e) {}
-});
+  // Mimics SQLite's prepare().run() — returns lastID
+  async run(text, params) {
+    const res = await pool.query(text, params);
+    return res;
+  }
+};
 
 module.exports = db;
