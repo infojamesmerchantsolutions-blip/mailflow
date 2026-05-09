@@ -146,7 +146,10 @@ async function processCampaign(campaign) {
       [campaign.id]
     );
     if (parseInt(anyPending.count) === 0) {
-      await db.run("UPDATE campaigns SET status = 'completed' WHERE id = $1", [campaign.id]);
+      await db.run(
+        "UPDATE campaigns SET status = 'completed' WHERE id = $1",
+        [campaign.id]
+      );
       console.log(`Campaign "${campaign.name}" completed!`);
     }
     return;
@@ -190,15 +193,14 @@ async function processCampaign(campaign) {
       [queueItem.acc_id]
     );
     await db.run(
-      `INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-       VALUES ($1, $2, $3, 'sent', $4, $5)`,
+      "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'sent', $4, $5)",
       [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0]
     );
 
-    console.log(`✓ Sent to ${queueItem.recipient_email}`);
+    console.log(`Sent to ${queueItem.recipient_email}`);
 
   } catch (err) {
-    console.error(`✗ Failed to send to ${queueItem.recipient_email}: ${err.message}`);
+    console.error(`Failed to send to ${queueItem.recipient_email}: ${err.message}`);
 
     const retryCount = (queueItem.retry_count || 0) + 1;
 
@@ -211,11 +213,10 @@ async function processCampaign(campaign) {
         [retryCount, err.message, newAccountId, queueItem.id]
       );
       await db.run(
-        `INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count)
-         VALUES ($1, $2, $3, 'retrying', $4, $5)`,
-        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} — retrying with different account`, retryCount]
+        "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'retrying', $4, $5)",
+        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} retrying`, retryCount]
       );
-      console.log(`↻ Retrying ${queueItem.recipient_email} (attempt ${retryCount}/${MAX_RETRIES})`);
+      console.log(`Retrying ${queueItem.recipient_email} attempt ${retryCount}`);
     } else {
       await db.run(
         "UPDATE queue SET status = 'failed', error = $1, retry_count = $2 WHERE id = $3",
@@ -224,3 +225,33 @@ async function processCampaign(campaign) {
       await db.run(
         'UPDATE campaigns SET failed_count = failed_count + 1 WHERE id = $1',
         [campaign.id]
+      );
+      await db.run(
+        "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'failed', $4, $5)",
+        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Permanently failed: ${err.message}`, retryCount]
+      );
+      console.log(`Permanently failed: ${queueItem.recipient_email}`);
+    }
+  }
+}
+
+async function processAllCampaigns() {
+  try {
+    const runningCampaigns = await db.all("SELECT * FROM campaigns WHERE status = 'running'");
+    if (runningCampaigns.length === 0) return;
+    await Promise.all(runningCampaigns.map(campaign => processCampaign(campaign)));
+  } catch (err) {
+    console.error('Scheduler error:', err.message);
+  }
+}
+
+cron.schedule('0 0 * * *', async () => {
+  await db.run("UPDATE accounts SET daily_sent = 0, last_reset = to_char(now(), 'YYYY-MM-DD HH24:MI:SS')");
+  console.log('Daily sent counts reset');
+});
+
+cron.schedule('* * * * * *', async () => {
+  await processAllCampaigns();
+});
+
+console.log('Scheduler started — ticking every second for precise delays');
