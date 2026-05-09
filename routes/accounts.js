@@ -9,9 +9,9 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const accounts = db.prepare('SELECT id, email, display_name, status, daily_sent, last_reset, created_at FROM accounts').all();
+    const accounts = await db.all('SELECT id, email, display_name, status, daily_sent, last_reset, created_at FROM accounts ORDER BY created_at DESC');
     res.json(accounts);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -24,7 +24,6 @@ router.get('/auth', (req, res) => {
     prompt: 'consent select_account',
     scope: [
       'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/userinfo.email'
     ]
   });
@@ -41,15 +40,17 @@ router.get('/callback', async (req, res) => {
     const profile = await gmail.users.getProfile({ userId: 'me' });
     const email = profile.data.emailAddress;
 
-    const existing = db.prepare('SELECT id FROM accounts WHERE email = ?').get(email);
+    const existing = await db.get('SELECT id FROM accounts WHERE email = $1', [email]);
     if (existing) {
-      db.prepare(`
-        UPDATE accounts SET access_token = ?, refresh_token = ?, token_expiry = ?, status = 'active' WHERE email = ?
-      `).run(tokens.access_token, tokens.refresh_token, tokens.expiry_date, email);
+      await db.run(
+        `UPDATE accounts SET access_token = $1, refresh_token = $2, token_expiry = $3, status = 'active' WHERE email = $4`,
+        [tokens.access_token, tokens.refresh_token, tokens.expiry_date, email]
+      );
     } else {
-      db.prepare(`
-        INSERT INTO accounts (email, access_token, refresh_token, token_expiry) VALUES (?, ?, ?, ?)
-      `).run(email, tokens.access_token, tokens.refresh_token, tokens.expiry_date);
+      await db.run(
+        `INSERT INTO accounts (email, access_token, refresh_token, token_expiry) VALUES ($1, $2, $3, $4)`,
+        [email, tokens.access_token, tokens.refresh_token, tokens.expiry_date]
+      );
     }
 
     res.send(`
@@ -67,49 +68,49 @@ router.get('/callback', async (req, res) => {
   }
 });
 
-// Update display name
-router.put('/:id/display-name', (req, res) => {
+router.put('/:id/display-name', async (req, res) => {
   try {
     const { display_name } = req.body;
-    db.prepare('UPDATE accounts SET display_name = ? WHERE id = ?').run(display_name, req.params.id);
+    await db.run('UPDATE accounts SET display_name = $1 WHERE id = $2', [display_name, req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Pause account
-router.post('/:id/pause', (req, res) => {
+router.post('/:id/pause', async (req, res) => {
   try {
-    db.prepare("UPDATE accounts SET status = 'paused' WHERE id = ?").run(req.params.id);
+    await db.run("UPDATE accounts SET status = 'paused' WHERE id = $1", [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Resume account
-router.post('/:id/resume', (req, res) => {
+router.post('/:id/resume', async (req, res) => {
   try {
-    db.prepare("UPDATE accounts SET status = 'active' WHERE id = ?").run(req.params.id);
+    await db.run("UPDATE accounts SET status = 'active' WHERE id = $1", [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM accounts WHERE id = ?').run(req.params.id);
+    await db.run('DELETE FROM accounts WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/:id/reset', (req, res) => {
+router.post('/:id/reset', async (req, res) => {
   try {
-    db.prepare(`UPDATE accounts SET daily_sent = 0, last_reset = datetime('now') WHERE id = ?`).run(req.params.id);
+    await db.run(
+      `UPDATE accounts SET daily_sent = 0, last_reset = to_char(now(), 'YYYY-MM-DD HH24:MI:SS') WHERE id = $1`,
+      [req.params.id]
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
