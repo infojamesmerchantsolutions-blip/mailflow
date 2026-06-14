@@ -250,7 +250,7 @@ cron.schedule('0 0 * * *', async () => {
   console.log('Daily sent counts reset');
 });
 
-cron.schedule('* * * * * *', async () => {
+cron.schedule('*/10 * * * * *', async () => {
   await processAllCampaigns();
 });
 
