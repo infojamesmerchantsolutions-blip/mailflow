@@ -137,4 +137,71 @@ router.post('/:id/reset', async (req, res) => {
   }
 });
 
+// Export all accounts to JSON
+router.get('/export', async (req, res) => {
+  try {
+    const accounts = await db.all('SELECT * FROM accounts ORDER BY created_at DESC');
+    res.json(accounts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Import accounts from JSON backup
+router.post('/import', async (req, res) => {
+  try {
+    const { accounts } = req.body;
+    if (!accounts || !Array.isArray(accounts)) {
+      return res.status(400).json({ error: 'Invalid data — expected an array of accounts' });
+    }
+
+    let imported = 0;
+    for (const account of accounts) {
+      try {
+        const existing = await db.get('SELECT id FROM accounts WHERE email = $1', [account.email]);
+        if (existing) {
+          await db.run(`
+            UPDATE accounts SET
+              display_name = $1,
+              access_token = $2,
+              refresh_token = $3,
+              token_expiry = $4,
+              status = $5,
+              daily_sent = $6
+            WHERE email = $7
+          `, [
+            account.display_name,
+            account.access_token,
+            account.refresh_token,
+            account.token_expiry,
+            account.status || 'active',
+            account.daily_sent || 0,
+            account.email
+          ]);
+        } else {
+          await db.run(`
+            INSERT INTO accounts (email, display_name, access_token, refresh_token, token_expiry, status, daily_sent)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [
+            account.email,
+            account.display_name,
+            account.access_token,
+            account.refresh_token,
+            account.token_expiry,
+            account.status || 'active',
+            account.daily_sent || 0
+          ]);
+        }
+        imported++;
+      } catch (e) {
+        console.error(`Failed to import account ${account.email}:`, e.message);
+      }
+    }
+
+    res.json({ success: true, imported });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
