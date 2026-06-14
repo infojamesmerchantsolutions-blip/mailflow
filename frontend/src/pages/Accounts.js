@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getAccounts, getAuthUrl, deleteAccount, resetAccount, pauseAccount, resumeAccount, updateDisplayName } from '../api';
+import axios from 'axios';
+
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://mailflow-ndex.onrender.com';
 
 const s = {
   title: { fontSize: '20px', fontWeight: '500', color: '#111', marginBottom: '4px' },
   sub: { fontSize: '13px', color: '#888', marginBottom: '20px' },
   topbar: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' },
   btnPrimary: { padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: 'none', background: '#111', color: '#fff', cursor: 'pointer' },
+  btnGreen: { padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: 'none', background: '#3B6D11', color: '#fff', cursor: 'pointer', marginLeft: '8px' },
+  btnBlue: { padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: 'none', background: '#185FA5', color: '#fff', cursor: 'pointer', marginLeft: '8px' },
   card: { background: '#fff', border: '0.5px solid #e0e0d8', borderRadius: '12px', padding: '14px 16px', marginBottom: '12px' },
   cardTitle: { fontSize: '13px', fontWeight: '500', color: '#111', marginBottom: '12px' },
   acctRow: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '0.5px solid #e0e0d8', flexWrap: 'wrap' },
@@ -32,6 +37,8 @@ const s = {
   statCard: { background: '#f5f5f0', borderRadius: '8px', padding: '10px 14px', textAlign: 'center' },
   statNum: { fontSize: '22px', fontWeight: '500', color: '#111' },
   statLabel: { fontSize: '11px', color: '#888', marginTop: '2px' },
+  importBox: { background: '#f5f5f0', borderRadius: '8px', padding: '14px', marginBottom: '12px' },
+  textarea: { width: '100%', fontSize: '12px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', resize: 'vertical', minHeight: '100px', fontFamily: 'monospace', outline: 'none' },
 };
 
 export default function Accounts() {
@@ -40,6 +47,10 @@ export default function Accounts() {
   const [editingName, setEditingName] = useState({});
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importData, setImportData] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = async () => {
     try {
@@ -93,6 +104,50 @@ export default function Accounts() {
     } catch (e) { showErr('Error saving name'); }
   };
 
+  // Export all accounts to JSON file
+  const handleExport = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/accounts/export`);
+      const data = JSON.stringify(res.data, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mailflow-accounts-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showMsg(`Exported ${res.data.length} accounts successfully!`);
+    } catch (e) {
+      showErr('Error exporting accounts');
+    }
+  };
+
+  // Import accounts from JSON
+  const handleImport = async () => {
+    try {
+      setImporting(true);
+      const parsed = JSON.parse(importData);
+      const res = await axios.post(`${BASE_URL}/api/accounts/import`, { accounts: parsed });
+      showMsg(`Successfully imported ${res.data.imported} accounts!`);
+      setShowImport(false);
+      setImportData('');
+      load();
+    } catch (e) {
+      showErr('Error importing accounts — make sure the JSON is valid');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Load JSON file
+  const handleFileLoad = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setImportData(ev.target.result);
+    reader.readAsText(file);
+  };
+
   const getInitials = (email) => {
     const parts = email.split('@')[0].split('.');
     return parts.map(p => p[0]?.toUpperCase()).join('').slice(0, 2);
@@ -109,13 +164,55 @@ export default function Accounts() {
           <div style={s.title}>Gmail accounts</div>
           <div style={s.sub}>Connect and manage your Gmail sending accounts</div>
         </div>
-        <button style={s.btnPrimary} onClick={handleConnect} disabled={loading}>
-          {loading ? 'Opening...' : '+ Connect Gmail account'}
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <button style={s.btnPrimary} onClick={handleConnect} disabled={loading}>
+            {loading ? 'Opening...' : '+ Connect account'}
+          </button>
+          <button style={s.btnGreen} onClick={handleExport}>⬇ Export backup</button>
+          <button style={s.btnBlue} onClick={() => setShowImport(!showImport)}>⬆ Import backup</button>
+        </div>
       </div>
 
       {msg && <div style={s.success}>{msg}</div>}
       {err && <div style={s.error}>{err}</div>}
+
+      {showImport && (
+        <div style={s.importBox}>
+          <div style={{ fontSize: '13px', fontWeight: '500', color: '#111', marginBottom: '8px' }}>
+            Import accounts from backup file
+          </div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+            Upload your backup JSON file or paste the contents below
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileLoad}
+            style={{ display: 'none' }}
+          />
+          <button
+            style={{ ...s.actionBtn, marginLeft: '0', marginBottom: '10px' }}
+            onClick={() => fileInputRef.current.click()}
+          >
+            Browse JSON file
+          </button>
+          <textarea
+            style={s.textarea}
+            placeholder="Or paste your backup JSON here..."
+            value={importData}
+            onChange={e => setImportData(e.target.value)}
+          />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button style={s.btnPrimary} onClick={handleImport} disabled={importing || !importData}>
+              {importing ? 'Importing...' : 'Import accounts'}
+            </button>
+            <button style={{ ...s.actionBtn, marginLeft: '0' }} onClick={() => { setShowImport(false); setImportData(''); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={s.statsRow}>
         <div style={s.statCard}>
@@ -133,17 +230,14 @@ export default function Accounts() {
       </div>
 
       <div style={s.infoBox}>
-        Emails are distributed equally across all <strong>active</strong> accounts using round-robin.
-        Pause any account that hits its daily limit — the scheduler will automatically skip paused accounts.
-        Each Gmail account can send up to <strong>500 emails/day</strong> (free) or <strong>2,000/day</strong> (Google Workspace).
-        Set a display name so recipients see a real name instead of just an email address.
+        Click <strong>Export backup</strong> regularly to save your accounts. If you ever lose your database, click <strong>Import backup</strong> and upload the file to restore everything instantly.
       </div>
 
       <div style={s.card}>
         <div style={s.cardTitle}>Connected accounts ({accounts.length})</div>
         {accounts.length === 0 && (
           <div style={s.emptyBox}>
-            No accounts connected yet. Click "+ Connect Gmail account" to get started.
+            No accounts connected yet. Click "+ Connect account" to get started.
           </div>
         )}
         {accounts.map(acct => (
@@ -155,7 +249,6 @@ export default function Accounts() {
             }}>
               {getInitials(acct.email)}
             </div>
-
             <div style={s.acctInfo}>
               <div style={s.acctEmail}>{acct.email}</div>
               <div style={s.acctSub}>
@@ -165,7 +258,7 @@ export default function Accounts() {
               <div style={s.nameRow}>
                 <input
                   style={s.nameInput}
-                  placeholder="Set display name (e.g. James Merchant)"
+                  placeholder="Set display name..."
                   value={editingName[acct.id] || ''}
                   onChange={e => setEditingName({ ...editingName, [acct.id]: e.target.value })}
                   onKeyDown={e => e.key === 'Enter' && handleSaveName(acct.id)}
@@ -178,14 +271,12 @@ export default function Accounts() {
                 </div>
               )}
             </div>
-
             <span style={{
               ...s.pill,
               ...(acct.status === 'active' ? s.pillOk : acct.status === 'paused' ? s.pillPaused : s.pillWarn)
             }}>
               {acct.status}
             </span>
-
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
               {acct.status === 'active'
                 ? <button style={s.actionBtnPause} onClick={() => handlePause(acct.id)}>Pause</button>
