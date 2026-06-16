@@ -42,3 +42,9 @@ export const deleteContactList = (name) => API.delete(`/api/contacts/lists/${nam
 export const getQueue = () => API.get('/api/queue');
 export const getStats = () => API.get('/api/queue/stats');
 export const getLogs = () => API.get('/api/queue/logs');
+
+// Analytics
+export const getAnalytics = () => API.get('/api/analytics');
+export const getAnalyticsOverview = () => API.get('/api/analytics/overview/stats');
+export const getCampaignOpens = (id) => API.get(`/api/analytics/${id}/opens`);
+export const getCampaignUnopened = (id) => API.get(`/api/analytics/${id}/unopened`);
