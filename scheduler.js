@@ -180,7 +180,8 @@ async function processCampaign(campaign) {
       queueItem.account_email,
       content.subject,
       content.body_html,
-      content.body_plain
+      content.body_plain,
+      queueItem.id
     );
 
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
