@@ -4,6 +4,7 @@ import Campaigns from './pages/Campaigns';
 import Contacts from './pages/Contacts';
 import Accounts from './pages/Accounts';
 import Logs from './pages/Logs';
+import Analytics from './pages/Analytics';
 import Templates from './pages/Templates';
 import PinModal from './components/PinModal';
 
@@ -30,6 +31,7 @@ const navItems = [
   { id: 'templates', label: 'Templates', color: '#534AB7', protected: true },
   { id: 'contacts', label: 'Contacts', color: '#D85A30', protected: true },
   { id: 'accounts', label: 'Gmail Accounts', color: '#854F0B', protected: true },
+  { id: 'analytics', label: 'Analytics', color: '#0E9E8E', protected: false },
   { id: 'logs', label: 'Logs', color: '#888', protected: false },
 ];
 
@@ -87,6 +89,7 @@ export default function App() {
       case 'templates': return <Templates requirePin={requirePin} />;
       case 'contacts': return <Contacts requirePin={requirePin} />;
       case 'accounts': return <Accounts requirePin={requirePin} />;
+      case 'analytics': return <Analytics />;
       case 'logs': return <Logs />;
       default: return <Dashboard />;
     }
