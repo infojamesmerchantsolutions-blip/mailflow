@@ -81,6 +81,16 @@ async function initDB() {
         retry_count INTEGER DEFAULT 0,
         created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
       );
+
+      CREATE TABLE IF NOT EXISTS opens (
+        id SERIAL PRIMARY KEY,
+        queue_id INTEGER,
+        campaign_id INTEGER,
+        recipient_email TEXT,
+        opened_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
+        ip_address TEXT,
+        user_agent TEXT
+      );
     `);
     console.log('Database initialized successfully');
   } finally {
