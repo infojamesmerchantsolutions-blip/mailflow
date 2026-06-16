@@ -30,9 +30,14 @@ async function getAuthForAccount(account) {
   return accountClient;
 }
 
-function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain) {
+function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain, queueId) {
   const boundary = 'mailflow_boundary';
   const fromField = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  // Inject tracking pixel into HTML body
+  const trackingPixel = `<img src="https://mailflow-ndex.onrender.com/api/track/open?id=${queueId}" width="1" height="1" style="display:none;" alt="" />`;
+  const trackedHtml = bodyHtml ? `${bodyHtml}\n${trackingPixel}` : trackingPixel;
+
   const message = [
     `To: ${to}`,
     `From: ${fromField}`,
@@ -48,7 +53,7 @@ function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain) {
     `--${boundary}`,
     'Content-Type: text/html; charset=UTF-8',
     '',
-    bodyHtml || '',
+    trackedHtml,
     '',
     `--${boundary}--`
   ].join('\n');
