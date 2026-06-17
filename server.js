@@ -18,6 +18,109 @@ app.post('/api/verify-pin', (req, res) => {
   }
 });
 
+// Known bot and scanner user agents to filter out
+const BOT_USER_AGENTS = [
+  'googleimageproxy',
+  'google image proxy',
+  'gmail',
+  'yahoo mail',
+  'microsoft',
+  'outlook',
+  'apple mail',
+  'mail.ru',
+  'thunderbird',
+  'bot',
+  'crawler',
+  'spider',
+  'preview',
+  'prefetch',
+  'scanner',
+  'validator',
+  'checker',
+  'monitor',
+  'wget',
+  'curl',
+  'python',
+  'java',
+  'ruby',
+  'php',
+  'go-http',
+  'okhttp',
+  'netsol',
+  'feedfetcher',
+  'mediapartners',
+  'adsbot',
+  'bingpreview',
+  'facebookexternalhit',
+  'twitterbot',
+  'linkedinbot',
+  'whatsapp',
+  'slack',
+  'telegram',
+  'viber',
+  'proofpoint',
+  'barracuda',
+  'mimecast',
+  'ironport',
+  'postfix',
+  'sendmail',
+  'exim',
+];
+
+function isBot(userAgent) {
+  if (!userAgent) return true;
+  const ua = userAgent.toLowerCase();
+  return BOT_USER_AGENTS.some(bot => ua.includes(bot));
+}
+
+// Email open tracking pixel endpoint
+app.get('/api/track/open', async (req, res) => {
+  try {
+    const { id } = req.query;
+    const userAgent = req.headers['user-agent'] || '';
+    const db = require('./db');
+
+    if (id && !isBot(userAgent)) {
+      const queueItem = await db.get(
+        'SELECT campaign_id, recipient_email FROM queue WHERE id = $1',
+        [id]
+      );
+
+      if (queueItem) {
+        await db.run(
+          `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            id,
+            queueItem.campaign_id,
+            queueItem.recipient_email,
+            req.ip || req.headers['x-forwarded-for'] || '',
+            userAgent
+          ]
+        );
+        console.log(`Real open recorded: ${queueItem.recipient_email}`);
+      }
+    } else if (id && isBot(userAgent)) {
+      console.log(`Bot open filtered out — UA: ${userAgent.substring(0, 50)}`);
+    }
+  } catch (err) {
+    console.error('Tracking error:', err.message);
+  }
+
+  // Always return a 1x1 transparent GIF
+  const pixel = Buffer.from(
+    'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    'base64'
+  );
+  res.writeHead(200, {
+    'Content-Type': 'image/gif',
+    'Content-Length': pixel.length,
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    'Pragma': 'no-cache'
+  });
+  res.end(pixel);
+});
+
 // Routes
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/campaigns', require('./routes/campaigns'));
@@ -55,52 +158,6 @@ app.get('/api/dashboard', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
-// Email open tracking pixel endpoint
-app.get('/api/track/open', async (req, res) => {
-  try {
-    const { id } = req.query;
-    const db = require('./db');
-
-    if (id) {
-      // Get queue item to find campaign and email
-      const queueItem = await db.get(
-        'SELECT campaign_id, recipient_email FROM queue WHERE id = $1',
-        [id]
-      );
-
-      if (queueItem) {
-        // Record the open
-        await db.run(
-          `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            id,
-            queueItem.campaign_id,
-            queueItem.recipient_email,
-            req.ip || req.headers['x-forwarded-for'] || '',
-            req.headers['user-agent'] || ''
-          ]
-        );
-      }
-    }
-  } catch (err) {
-    console.error('Tracking error:', err.message);
-  }
-
-  // Always return a 1x1 transparent GIF
-  const pixel = Buffer.from(
-    'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-    'base64'
-  );
-  res.writeHead(200, {
-    'Content-Type': 'image/gif',
-    'Content-Length': pixel.length,
-    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-    'Pragma': 'no-cache'
-  });
-  res.end(pixel);
 });
 
 // Start scheduler
