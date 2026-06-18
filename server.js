@@ -18,59 +18,36 @@ app.post('/api/verify-pin', (req, res) => {
   }
 });
 
-// Known bot and scanner user agents to filter out
-const BOT_USER_AGENTS = [
-  'googleimageproxy',
-  'google image proxy',
-  'gmail',
-  'yahoo mail',
-  'microsoft',
-  'outlook',
-  'apple mail',
-  'mail.ru',
-  'thunderbird',
-  'bot',
-  'crawler',
-  'spider',
-  'preview',
-  'prefetch',
-  'scanner',
-  'validator',
-  'checker',
-  'monitor',
-  'wget',
-  'curl',
-  'python',
-  'java',
-  'ruby',
-  'php',
-  'go-http',
-  'okhttp',
-  'netsol',
-  'feedfetcher',
-  'mediapartners',
-  'adsbot',
-  'bingpreview',
-  'facebookexternalhit',
-  'twitterbot',
-  'linkedinbot',
-  'whatsapp',
-  'slack',
-  'telegram',
-  'viber',
-  'proofpoint',
-  'barracuda',
-  'mimecast',
-  'ironport',
-  'postfix',
-  'sendmail',
-  'exim',
+// Known bot datacenter IP ranges
+const BOT_IP_RANGES = [
+  '66.102.', '64.233.', '72.14.', '74.125.', '209.85.',  // Google
+  '40.92.', '40.107.', '52.100.', '52.101.', '104.47.',   // Microsoft/Outlook
+  '17.',                                                     // Apple
+  '207.46.', '65.52.', '157.55.',                          // Microsoft extra
+  '108.177.', '142.250.', '172.217.',                      // Google extra
 ];
 
-function isBot(userAgent) {
-  if (!userAgent) return true;
-  const ua = userAgent.toLowerCase();
-  return BOT_USER_AGENTS.some(bot => ua.includes(bot));
+// Known bot user agents
+const BOT_USER_AGENTS = [
+  'googleimageproxy', 'google image proxy',
+  'microsoftpreview', 'outlookpreview',
+  'applemail', 'apple mail privacy',
+  'yahoo mail smartmail', 'proofpoint',
+  'barracuda', 'mimecast', 'ironport',
+  'feedfetcher', 'mediapartners', 'adsbot',
+  'bingpreview', 'bot', 'crawler', 'spider',
+  'preview', 'prefetch', 'scanner',
+  'validator', 'checker', 'monitor',
+  'wget', 'curl', 'python-requests',
+  'go-http-client', 'okhttp', 'java/',
+  'ruby/', 'php/', 'postfix', 'sendmail', 'exim',
+];
+
+function isKnownBot(ip, userAgent) {
+  const ua = (userAgent || '').toLowerCase();
+  const isUaBot = BOT_USER_AGENTS.some(bot => ua.includes(bot));
+  const isIpBot = BOT_IP_RANGES.some(range => (ip || '').startsWith(range));
+  return isUaBot || isIpBot;
 }
 
 // Email open tracking pixel endpoint
@@ -78,36 +55,36 @@ app.get('/api/track/open', async (req, res) => {
   try {
     const { id } = req.query;
     const userAgent = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
     const db = require('./db');
 
-    if (id && !isBot(userAgent)) {
+    if (id) {
       const queueItem = await db.get(
-        'SELECT campaign_id, recipient_email FROM queue WHERE id = $1',
+        'SELECT campaign_id, recipient_email, sent_at FROM queue WHERE id = $1',
         [id]
       );
 
       if (queueItem) {
+        const isBot = isKnownBot(ip, userAgent);
+
+        // Always record the open but flag if bot
         await db.run(
-          `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            id,
-            queueItem.campaign_id,
-            queueItem.recipient_email,
-            req.ip || req.headers['x-forwarded-for'] || '',
-            userAgent
-          ]
+          `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent, is_bot)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, queueItem.campaign_id, queueItem.recipient_email, ip, userAgent, isBot]
         );
-        console.log(`Real open recorded: ${queueItem.recipient_email}`);
+
+        if (isBot) {
+          console.log(`Bot open filtered: ${queueItem.recipient_email} — IP: ${ip}`);
+        } else {
+          console.log(`Real open recorded: ${queueItem.recipient_email}`);
+        }
       }
-    } else if (id && isBot(userAgent)) {
-      console.log(`Bot open filtered out — UA: ${userAgent.substring(0, 50)}`);
     }
   } catch (err) {
     console.error('Tracking error:', err.message);
   }
 
-  // Always return a 1x1 transparent GIF
   const pixel = Buffer.from(
     'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
     'base64'
@@ -119,6 +96,39 @@ app.get('/api/track/open', async (req, res) => {
     'Pragma': 'no-cache'
   });
   res.end(pixel);
+});
+
+// Click tracking redirect endpoint
+app.get('/api/track/click', async (req, res) => {
+  const { id, url } = req.query;
+  const userAgent = req.headers['user-agent'] || '';
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
+
+  try {
+    const db = require('./db');
+
+    if (id && url) {
+      const queueItem = await db.get(
+        'SELECT campaign_id, recipient_email FROM queue WHERE id = $1',
+        [id]
+      );
+
+      if (queueItem) {
+        await db.run(
+          `INSERT INTO clicks (queue_id, campaign_id, recipient_email, original_url, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, queueItem.campaign_id, queueItem.recipient_email, decodeURIComponent(url), ip, userAgent]
+        );
+        console.log(`Click recorded: ${queueItem.recipient_email} → ${decodeURIComponent(url)}`);
+      }
+    }
+  } catch (err) {
+    console.error('Click tracking error:', err.message);
+  }
+
+  // Redirect to original URL
+  const redirectUrl = url ? decodeURIComponent(url) : '/';
+  res.redirect(302, redirectUrl);
 });
 
 // Routes
