@@ -89,6 +89,18 @@ async function initDB() {
         recipient_email TEXT,
         opened_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
         ip_address TEXT,
+        user_agent TEXT,
+        is_bot BOOLEAN DEFAULT FALSE
+      );
+
+      CREATE TABLE IF NOT EXISTS clicks (
+        id SERIAL PRIMARY KEY,
+        queue_id INTEGER,
+        campaign_id INTEGER,
+        recipient_email TEXT,
+        original_url TEXT,
+        clicked_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
+        ip_address TEXT,
         user_agent TEXT
       );
     `);
@@ -118,7 +130,6 @@ const db = {
     return res;
   },
 
-  // Compatibility shim for any old SQLite prepare() calls
   prepare(text) {
     return {
       get: async (...params) => {
