@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 
 const MAX_RETRIES = 3;
 const lastSentTime = {};
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://mailflow-ndex.onrender.com';
 
 async function getAuthForAccount(account) {
   const accountClient = new google.auth.OAuth2(
@@ -30,13 +31,31 @@ async function getAuthForAccount(account) {
   return accountClient;
 }
 
+// Inject tracking pixel and wrap links for click tracking
+function injectTracking(html, queueId) {
+  if (!html) return html;
+
+  // Inject tracking pixel at the bottom
+  const trackingPixel = `<img src="${RENDER_URL}/api/track/open?id=${queueId}" width="1" height="1" style="display:none;border:0;" alt="" />`;
+
+  // Wrap all links with click tracking
+  const trackedHtml = html.replace(
+    /href="(https?:\/\/[^"]+)"/g,
+    (match, url) => {
+      // Don't track unsubscribe or tracking links
+      if (url.includes('/track/') || url.includes('unsubscribe')) return match;
+      const encodedUrl = encodeURIComponent(url);
+      return `href="${RENDER_URL}/api/track/click?id=${queueId}&url=${encodedUrl}"`;
+    }
+  );
+
+  return `${trackedHtml}\n${trackingPixel}`;
+}
+
 function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain, queueId) {
   const boundary = 'mailflow_boundary';
   const fromField = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
-
-  // Inject tracking pixel into HTML body
-  const trackingPixel = `<img src="https://mailflow-ndex.onrender.com/api/track/open?id=${queueId}" width="1" height="1" style="display:none;" alt="" />`;
-  const trackedHtml = bodyHtml ? `${bodyHtml}\n${trackingPixel}` : trackingPixel;
+  const trackedHtml = injectTracking(bodyHtml, queueId);
 
   const message = [
     `To: ${to}`,
@@ -53,7 +72,7 @@ function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain, queueI
     `--${boundary}`,
     'Content-Type: text/html; charset=UTF-8',
     '',
-    trackedHtml,
+    trackedHtml || '',
     '',
     `--${boundary}--`
   ].join('\n');
@@ -203,10 +222,10 @@ async function processCampaign(campaign) {
       [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0]
     );
 
-    console.log(`Sent to ${queueItem.recipient_email}`);
+    console.log(`✓ Sent to ${queueItem.recipient_email}`);
 
   } catch (err) {
-    console.error(`Failed to send to ${queueItem.recipient_email}: ${err.message}`);
+    console.error(`✗ Failed to send to ${queueItem.recipient_email}: ${err.message}`);
 
     const retryCount = (queueItem.retry_count || 0) + 1;
 
@@ -222,7 +241,7 @@ async function processCampaign(campaign) {
         "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'retrying', $4, $5)",
         [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} retrying`, retryCount]
       );
-      console.log(`Retrying ${queueItem.recipient_email} attempt ${retryCount}`);
+      console.log(`↻ Retrying ${queueItem.recipient_email} attempt ${retryCount}`);
     } else {
       await db.run(
         "UPDATE queue SET status = 'failed', error = $1, retry_count = $2 WHERE id = $3",
@@ -236,7 +255,7 @@ async function processCampaign(campaign) {
         "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'failed', $4, $5)",
         [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Permanently failed: ${err.message}`, retryCount]
       );
-      console.log(`Permanently failed: ${queueItem.recipient_email}`);
+      console.log(`✗ Permanently failed: ${queueItem.recipient_email}`);
     }
   }
 }
@@ -260,4 +279,4 @@ cron.schedule('*/2 * * * * *', async () => {
   await processAllCampaigns();
 });
 
-console.log('Scheduler started — ticking every second for precise delays');
+console.log('Scheduler started — ticking every 2 seconds for precise delays');
