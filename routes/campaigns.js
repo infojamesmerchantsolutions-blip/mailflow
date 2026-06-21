@@ -146,6 +146,9 @@ router.post('/:id/resume', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await db.run('DELETE FROM queue WHERE campaign_id = $1', [req.params.id]);
+    await db.run('DELETE FROM opens WHERE campaign_id = $1', [req.params.id]);
+    await db.run('DELETE FROM clicks WHERE campaign_id = $1', [req.params.id]);
+    await db.run('DELETE FROM logs WHERE campaign_id = $1', [req.params.id]);
     await db.run('DELETE FROM campaigns WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
