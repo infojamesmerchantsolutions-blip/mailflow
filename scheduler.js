@@ -31,48 +31,84 @@ async function getAuthForAccount(account) {
   return accountClient;
 }
 
-// Inject tracking pixel and wrap links for click tracking
-function injectTracking(html, queueId) {
-  if (!html) return html;
+// Build tracking pixel HTML
+function trackingPixel(queueId) {
+  return `<img src="${RENDER_URL}/api/track/open?id=${queueId}" width="1" height="1" style="display:none;border:0;outline:0;" alt="" />`;
+}
 
-  // Inject tracking pixel at the bottom
-  const trackingPixel = `<img src="${RENDER_URL}/api/track/open?id=${queueId}" width="1" height="1" style="display:none;border:0;" alt="" />`;
+// Wrap plain text in minimal HTML so tracking pixel works
+function plainTextToHtml(text, queueId) {
+  if (!text) return trackingPixel(queueId);
+  // Convert line breaks to <br> and wrap in minimal HTML
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+  return `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333;">${escaped}</div>${trackingPixel(queueId)}`;
+}
+
+// Inject tracking pixel into HTML body and wrap links for click tracking
+function injectTracking(html, queueId) {
+  if (!html) return trackingPixel(queueId);
 
   // Wrap all links with click tracking
   const trackedHtml = html.replace(
     /href="(https?:\/\/[^"]+)"/g,
     (match, url) => {
-      // Don't track unsubscribe or tracking links
       if (url.includes('/track/') || url.includes('unsubscribe')) return match;
       const encodedUrl = encodeURIComponent(url);
       return `href="${RENDER_URL}/api/track/click?id=${queueId}&url=${encodedUrl}"`;
     }
   );
 
-  return `${trackedHtml}\n${trackingPixel}`;
+  return `${trackedHtml}\n${trackingPixel(queueId)}`;
 }
 
 function makeEmail(to, fromName, fromEmail, subject, bodyHtml, bodyPlain, queueId) {
   const boundary = 'mailflow_boundary';
   const fromField = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
-  const trackedHtml = injectTracking(bodyHtml, queueId);
+
+  // Determine what content to send
+  const hasHtml = bodyHtml && bodyHtml.trim();
+  const hasPlain = bodyPlain && bodyPlain.trim();
+
+  let finalHtml;
+  let finalPlain;
+
+  if (hasHtml) {
+    // Has HTML — inject tracking pixel and click tracking
+    finalHtml = injectTracking(bodyHtml, queueId);
+    finalPlain = bodyPlain || '';
+  } else if (hasPlain) {
+    // Plain text only — wrap in minimal HTML for tracking pixel
+    finalHtml = plainTextToHtml(bodyPlain, queueId);
+    finalPlain = bodyPlain;
+  } else {
+    // No body at all — just send tracking pixel
+    finalHtml = trackingPixel(queueId);
+    finalPlain = '';
+  }
+
+  // Use subject or fallback to empty string
+  const finalSubject = (subject && subject.trim()) ? subject : '(no subject)';
 
   const message = [
     `To: ${to}`,
     `From: ${fromField}`,
-    `Subject: ${subject}`,
+    `Subject: ${finalSubject}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
     `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     '',
-    bodyPlain || '',
+    finalPlain,
     '',
     `--${boundary}`,
     'Content-Type: text/html; charset=UTF-8',
     '',
-    trackedHtml || '',
+    finalHtml,
     '',
     `--${boundary}--`
   ].join('\n');
@@ -90,18 +126,18 @@ function pickRandomContent(campaign) {
       const variations = JSON.parse(campaign.content_variations);
       if (Array.isArray(variations) && variations.length > 1) {
         const pick = variations[Math.floor(Math.random() * variations.length)];
-        console.log(`Picked variation: ${pick.subject}`);
+        console.log(`Picked variation: ${pick.subject || '(no subject)'}`);
         return {
-          subject: pick.subject,
-          body_html: pick.body_html,
-          body_plain: pick.body_plain
+          subject: pick.subject || '',
+          body_html: pick.body_html || '',
+          body_plain: pick.body_plain || ''
         };
       }
       if (Array.isArray(variations) && variations.length === 1) {
         return {
-          subject: variations[0].subject,
-          body_html: variations[0].body_html,
-          body_plain: variations[0].body_plain
+          subject: variations[0].subject || '',
+          body_html: variations[0].body_html || '',
+          body_plain: variations[0].body_plain || ''
         };
       }
     }
@@ -109,9 +145,9 @@ function pickRandomContent(campaign) {
     console.error('Error parsing content variations:', e.message);
   }
   return {
-    subject: campaign.subject,
-    body_html: campaign.body_html,
-    body_plain: campaign.body_plain
+    subject: campaign.subject || '',
+    body_html: campaign.body_html || '',
+    body_plain: campaign.body_plain || ''
   };
 }
 
@@ -183,7 +219,7 @@ async function processCampaign(campaign) {
   const content = pickRandomContent(campaign);
 
   try {
-    console.log(`[${new Date().toISOString()}] Sending to ${queueItem.recipient_email} via ${queueItem.account_email} | Subject: ${content.subject}`);
+    console.log(`[${new Date().toISOString()}] Sending to ${queueItem.recipient_email} via ${queueItem.account_email}`);
 
     const auth = await getAuthForAccount({
       id: queueItem.acc_id,
@@ -219,7 +255,7 @@ async function processCampaign(campaign) {
     );
     await db.run(
       "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'sent', $4, $5)",
-      [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent with subject: ${content.subject}`, queueItem.retry_count || 0]
+      [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Sent: ${content.subject || '(no subject)'}`, queueItem.retry_count || 0]
     );
 
     console.log(`✓ Sent to ${queueItem.recipient_email}`);
@@ -239,7 +275,7 @@ async function processCampaign(campaign) {
       );
       await db.run(
         "INSERT INTO logs (campaign_id, account_id, recipient_email, status, message, retry_count) VALUES ($1, $2, $3, 'retrying', $4, $5)",
-        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} retrying`, retryCount]
+        [campaign.id, queueItem.acc_id, queueItem.recipient_email, `Failed: ${err.message} — retrying`, retryCount]
       );
       console.log(`↻ Retrying ${queueItem.recipient_email} attempt ${retryCount}`);
     } else {
@@ -279,4 +315,4 @@ cron.schedule('*/2 * * * * *', async () => {
   await processAllCampaigns();
 });
 
-console.log('Scheduler started — ticking every 2 seconds for precise delays');
+console.log('Scheduler started — ticking every 2 seconds');
