@@ -18,36 +18,36 @@ app.post('/api/verify-pin', (req, res) => {
   }
 });
 
-// Known bot datacenter IP ranges
-const BOT_IP_RANGES = [
-  '66.102.', '64.233.', '72.14.', '74.125.', '209.85.',  // Google
-  '40.92.', '40.107.', '52.100.', '52.101.', '104.47.',   // Microsoft/Outlook
-  '17.',                                                     // Apple
-  '207.46.', '65.52.', '157.55.',                          // Microsoft extra
-  '108.177.', '142.250.', '172.217.',                      // Google extra
+// Gmail and email client proxy IPs
+const GMAIL_PROXY_IPS = [
+  '66.102.', '64.233.', '72.14.', '74.125.', '209.85.',
+  '108.177.', '142.250.', '172.217.',
 ];
 
-// Known bot user agents
-const BOT_USER_AGENTS = [
-  'googleimageproxy', 'google image proxy',
-  'microsoftpreview', 'outlookpreview',
-  'applemail', 'apple mail privacy',
-  'yahoo mail smartmail', 'proofpoint',
-  'barracuda', 'mimecast', 'ironport',
-  'feedfetcher', 'mediapartners', 'adsbot',
-  'bingpreview', 'bot', 'crawler', 'spider',
-  'preview', 'prefetch', 'scanner',
-  'validator', 'checker', 'monitor',
-  'wget', 'curl', 'python-requests',
-  'go-http-client', 'okhttp', 'java/',
-  'ruby/', 'php/', 'postfix', 'sendmail', 'exim',
+// Definite non-human bots
+const DEFINITE_BOTS = [
+  'spider', 'crawler', 'bot/', 'feedfetcher',
+  'wget', 'curl', 'python-requests', 'go-http-client',
+  'java/', 'ruby/', 'php/', 'postfix', 'sendmail',
 ];
 
-function isKnownBot(ip, userAgent) {
+function classifyOpen(ip, userAgent) {
   const ua = (userAgent || '').toLowerCase();
-  const isUaBot = BOT_USER_AGENTS.some(bot => ua.includes(bot));
-  const isIpBot = BOT_IP_RANGES.some(range => (ip || '').startsWith(range));
-  return isUaBot || isIpBot;
+
+  // Definite bot
+  if (DEFINITE_BOTS.some(bot => ua.includes(bot))) return 'bot';
+
+  // Gmail/Google proxy
+  if (GMAIL_PROXY_IPS.some(range => (ip || '').startsWith(range))) return 'proxy';
+
+  // Microsoft/Outlook proxy
+  if (['40.92.', '40.107.', '52.100.', '104.47.'].some(r => (ip || '').startsWith(r))) return 'proxy';
+
+  // Apple Mail Privacy
+  if ((ip || '').startsWith('17.')) return 'proxy';
+
+  // Real human open
+  return 'human';
 }
 
 // Email open tracking pixel endpoint
@@ -65,19 +65,19 @@ app.get('/api/track/open', async (req, res) => {
       );
 
       if (queueItem) {
-        const isBot = isKnownBot(ip, userAgent);
+        const openType = classifyOpen(ip, userAgent);
+        const isBot = openType === 'bot';
 
-        // Always record the open but flag if bot
-        await db.run(
-          `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent, is_bot)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [id, queueItem.campaign_id, queueItem.recipient_email, ip, userAgent, isBot]
-        );
-
-        if (isBot) {
-          console.log(`Bot open filtered: ${queueItem.recipient_email} — IP: ${ip}`);
+        // Record ALL opens except definite bots
+        if (openType !== 'bot') {
+          await db.run(
+            `INSERT INTO opens (queue_id, campaign_id, recipient_email, ip_address, user_agent, is_bot)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [id, queueItem.campaign_id, queueItem.recipient_email, ip, userAgent, isBot]
+          );
+          console.log(`Open recorded (${openType}): ${queueItem.recipient_email}`);
         } else {
-          console.log(`Real open recorded: ${queueItem.recipient_email}`);
+          console.log(`Bot blocked: ${queueItem.recipient_email}`);
         }
       }
     }
