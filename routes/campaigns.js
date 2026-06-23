@@ -29,27 +29,7 @@ router.post('/', async (req, res) => {
       schedule_type, content_variations, content_mode
     } = req.body;
 
-    let parsedVariations = [];
-    try {
-      parsedVariations = JSON.parse(content_variations || '[]');
-    } catch (e) {
-      parsedVariations = [];
-    }
-
-    console.log(`Creating campaign with ${parsedVariations.length} variations`);
-    parsedVariations.forEach((v, i) => {
-      console.log(`Variation ${i + 1}: ${v.subject}`);
-    });
-
-    router.post('/', async (req, res) => {
-  try {
-    const {
-      name, subject, body_html, body_plain,
-      contact_list, delay_seconds, start_time, end_time,
-      schedule_type, content_variations, content_mode
-    } = req.body;
-
-    // Only campaign name is required
+    // Only campaign name and contact list are required
     if (!name) return res.status(400).json({ error: 'Campaign name is required' });
     if (!contact_list) return res.status(400).json({ error: 'Contact list is required' });
 
@@ -105,7 +85,7 @@ router.post('/:id/launch', async (req, res) => {
     try {
       const vars = JSON.parse(campaign.content_variations || '[]');
       console.log(`Launching campaign "${campaign.name}" with ${vars.length} variations:`);
-      vars.forEach((v, i) => console.log(`  Variation ${i + 1}: ${v.subject}`));
+      vars.forEach((v, i) => console.log(`  Variation ${i + 1}: ${v.subject || '(no subject)'}`));
     } catch (e) {}
 
     const contacts = await db.all(
