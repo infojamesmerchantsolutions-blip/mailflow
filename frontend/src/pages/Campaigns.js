@@ -1,4 +1,3 @@
-import React, { useState, useEffect, useRef } from 'react';
 import { getCampaigns, createCampaign, launchCampaign, pauseCampaign, resumeCampaign, deleteCampaign, getContactLists, getTemplates } from '../api';
 
 const s = {
@@ -15,13 +14,11 @@ const s = {
   input: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none' },
   select: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
   row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
-  row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' },
   variationCard: { border: '0.5px solid #e0e0d8', borderRadius: '10px', padding: '14px', marginBottom: '12px', background: '#fafaf8' },
   variationHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' },
-  variationTitle: { fontSize: '13px', fontWeight: '500', color: '#111' },
   editorWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '0.5px solid #ccc', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' },
   editorHeader: { padding: '7px 12px', background: '#f5f5f0', borderBottom: '0.5px solid #ccc', fontSize: '12px', fontWeight: '500', color: '#666' },
-  editorTextarea: { width: '100%', fontSize: '12px', padding: '10px', border: 'none', borderRight: '0.5px solid #ccc', resize: 'none', minHeight: '200px', fontFamily: 'monospace', lineHeight: '1.6', outline: 'none', background: '#fff' },
+  editorTextarea: { width: '100%', fontSize: '12px', padding: '10px', border: 'none', borderRight: '0.5px solid #ccc', resize: 'none', minHeight: '180px', fontFamily: 'monospace', lineHeight: '1.6', outline: 'none', background: '#fff' },
   plainTextarea: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', resize: 'vertical', minHeight: '70px', lineHeight: '1.6', outline: 'none', fontFamily: 'inherit' },
   speedGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px', marginTop: '6px' },
   speedOpt: { border: '0.5px solid #ccc', borderRadius: '8px', padding: '8px 6px', cursor: 'pointer', textAlign: 'center' },
@@ -56,6 +53,7 @@ const s = {
   templatePickRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' },
   templatePickSelect: { flex: 1, fontSize: '13px', padding: '7px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
   templatePickBtn: { padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: 'none', background: '#534AB7', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' },
+  hintText: { fontSize: '11px', color: '#aaa', marginTop: '4px' },
 };
 
 const speedOptions = [
@@ -66,16 +64,11 @@ const speedOptions = [
   { label: '3s', sub: 'Fastest', value: 3 },
 ];
 
-const defaultHtml = `<h2 style="color:#111;">Hello there!</h2>
-<p>This is your email content. You can use HTML to style it.</p>
-<a href="https://yoursite.com" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;border-radius:6px;text-decoration:none;">Click here</a>
-<p style="color:#888;font-size:12px;margin-top:24px;">To unsubscribe, reply to this email.</p>`;
-
 const emptyVariation = () => ({
   id: Date.now() + Math.random(),
   subject: '',
-  body_html: defaultHtml,
-  body_plain: 'Hello there!\n\nThis is your email content.\n\nTo unsubscribe, reply to this email.',
+  body_html: '',
+  body_plain: '',
 });
 
 function VariationEditor({ variation, index, onChange, onRemove, showRemove, templates }) {
@@ -87,7 +80,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
       previewRef.current.srcdoc = `
         <html>
           <body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">
-            ${variation.body_html}
+            ${variation.body_html || '<p style="color:#aaa;">HTML preview will appear here...</p>'}
           </body>
         </html>`;
     }
@@ -97,7 +90,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
     if (!selectedTemplate) return;
     const t = templates.find(t => t.id === parseInt(selectedTemplate));
     if (!t) return;
-    onChange({ ...variation, subject: t.subject, body_html: t.body_html, body_plain: t.body_plain });
+    onChange({ ...variation, subject: t.subject || '', body_html: t.body_html || '', body_plain: t.body_plain || '' });
     setSelectedTemplate('');
   };
 
@@ -113,34 +106,31 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
 
       {templates.length > 0 && (
         <div style={s.templatePickRow}>
-          <select
-            style={s.templatePickSelect}
-            value={selectedTemplate}
-            onChange={e => setSelectedTemplate(e.target.value)}
-          >
+          <select style={s.templatePickSelect} value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
             <option value="">Load from saved template...</option>
             {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name} — {t.subject}</option>
+              <option key={t.id} value={t.id}>{t.name}{t.subject ? ` — ${t.subject}` : ''}</option>
             ))}
           </select>
-          <button style={s.templatePickBtn} onClick={applyTemplate}>Apply template</button>
+          <button style={s.templatePickBtn} onClick={applyTemplate}>Apply</button>
         </div>
       )}
 
-      <div style={s.label}>Subject line</div>
+      <div style={s.label}>Subject line <span style={s.hintText}>(optional)</span></div>
       <input
         style={s.input}
-        placeholder={`e.g. Subject variation ${index + 1}`}
+        placeholder="Leave empty to send without subject"
         value={variation.subject}
         onChange={e => onChange({ ...variation, subject: e.target.value })}
       />
 
-      <div style={s.label}>Email body (HTML + live preview)</div>
+      <div style={s.label}>HTML body <span style={s.hintText}>(optional — leave empty to send plain text only)</span></div>
       <div style={s.editorWrap}>
         <div>
           <div style={s.editorHeader}>HTML editor</div>
           <textarea
             style={s.editorTextarea}
+            placeholder="Paste your HTML here... or leave empty"
             value={variation.body_html}
             onChange={e => onChange({ ...variation, body_html: e.target.value })}
             spellCheck={false}
@@ -150,19 +140,19 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
           <div style={s.editorHeader}>Live preview</div>
           <iframe
             ref={previewRef}
-            style={{ width: '100%', minHeight: '200px', border: 'none' }}
+            style={{ width: '100%', minHeight: '180px', border: 'none' }}
             title={`preview-${index}`}
             sandbox="allow-same-origin"
           />
         </div>
       </div>
 
-      <div style={s.label}>Plain text fallback</div>
+      <div style={s.label}>Plain text <span style={s.hintText}>(optional — used when HTML not available or as standalone)</span></div>
       <textarea
         style={s.plainTextarea}
+        placeholder="Plain text version... or leave empty"
         value={variation.body_plain}
         onChange={e => onChange({ ...variation, body_plain: e.target.value })}
-        placeholder="Plain text version..."
       />
     </div>
   );
@@ -209,40 +199,38 @@ export default function Campaigns() {
     setVariations(variations.filter((_, i) => i !== index));
   };
 
+  // Only campaign name and contact list are required
   const validate = () => {
-  if (!form.name) return showErr('Please enter a campaign name') || false;
-  if (!form.contact_list) return showErr('Please select a contact list') || false;
-  return true;
-};
-
-  const compressHtml = (html) => {
-  if (!html) return '';
-  return html
-    .replace(/\s+/g, ' ')
-    .replace(/>\s+</g, '><')
-    .trim();
-};
-
-const buildPayload = () => {
-  const compressedVariations = variations.map(v => ({
-    ...v,
-    body_html: compressHtml(v.body_html),
-  }));
-
-  return {
-    name: form.name,
-    subject: compressedVariations[0].subject,
-    body_html: compressedVariations[0].body_html,
-    body_plain: compressedVariations[0].body_plain,
-    contact_list: form.contact_list,
-    delay_seconds: speed,
-    schedule_type: scheduleType,
-    start_time: scheduleType === 'immediate' ? '00:00' : form.start_time,
-    end_time: scheduleType === 'immediate' ? '23:59' : form.end_time,
-    content_variations: JSON.stringify(compressedVariations),
-    content_mode: 'random',
+    if (!form.name) return showErr('Please enter a campaign name') || false;
+    if (!form.contact_list) return showErr('Please select a contact list') || false;
+    return true;
   };
-};
+
+  const buildPayload = () => {
+    const compressHtml = (html) => {
+      if (!html) return '';
+      return html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
+    };
+
+    const compressedVariations = variations.map(v => ({
+      ...v,
+      body_html: compressHtml(v.body_html),
+    }));
+
+    return {
+      name: form.name,
+      subject: compressedVariations[0]?.subject || '',
+      body_html: compressHtml(compressedVariations[0]?.body_html || ''),
+      body_plain: compressedVariations[0]?.body_plain || '',
+      contact_list: form.contact_list,
+      delay_seconds: speed,
+      schedule_type: scheduleType,
+      start_time: scheduleType === 'immediate' ? '00:00' : form.start_time,
+      end_time: scheduleType === 'immediate' ? '23:59' : form.end_time,
+      content_variations: JSON.stringify(compressedVariations),
+      content_mode: 'random',
+    };
+  };
 
   const resetForm = () => {
     setShowForm(false);
@@ -267,7 +255,7 @@ const buildPayload = () => {
     try {
       const res = await createCampaign(buildPayload());
       await launchCampaign(res.data.id);
-      showMsg('Campaign launched! Emails are now being sent.');
+      showMsg('Campaign launched!');
       resetForm();
       load();
     } catch (e) { showErr(e.response?.data?.error || 'Error launching campaign'); }
@@ -287,7 +275,7 @@ const buildPayload = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this campaign and all its queue?')) return;
+    if (!window.confirm('Delete this campaign?')) return;
     try { await deleteCampaign(id); load(); } catch (e) { showErr('Error deleting'); }
   };
 
@@ -330,11 +318,11 @@ const buildPayload = () => {
 
           <div style={s.row2}>
             <div>
-              <div style={s.label}>Campaign name</div>
+              <div style={s.label}>Campaign name <span style={{ color: '#A32D2D' }}>*</span></div>
               <input style={s.input} placeholder="e.g. Black Friday promo" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <div style={s.label}>Contact list</div>
+              <div style={s.label}>Contact list <span style={{ color: '#A32D2D' }}>*</span></div>
               <select style={s.select} value={form.contact_list} onChange={e => setForm({ ...form, contact_list: e.target.value })}>
                 <option value="">Select a list...</option>
                 {lists.map(l => <option key={l.list_name} value={l.list_name}>{l.list_name} ({l.count} contacts)</option>)}
@@ -342,16 +330,15 @@ const buildPayload = () => {
             </div>
           </div>
 
+          <div style={s.infoBox}>
+            Only campaign name and contact list are required. Subject, HTML body and plain text are all optional — send whatever you have.
+          </div>
+
           <hr style={s.divider} />
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={s.cardTitle}>Email content variations</div>
-            <div style={{ fontSize: '12px', color: '#888' }}>{variations.length} variation{variations.length > 1 ? 's' : ''} · randomly distributed</div>
-          </div>
-
-          <div style={s.infoBox}>
-            Add multiple variations — the system randomly picks one per recipient to avoid spam filters.
-            You can load from your saved templates or write from scratch.
+            <div style={{ fontSize: '12px', color: '#888' }}>{variations.length} variation{variations.length > 1 ? 's' : ''}</div>
           </div>
 
           {variations.map((v, i) => (
@@ -375,7 +362,7 @@ const buildPayload = () => {
           <div style={s.cardTitle}>Schedule</div>
           <div style={s.scheduleGrid}>
             {[
-              { label: 'Send immediately', sub: 'Starts right after launch, runs 24/7', value: 'immediate' },
+              { label: 'Send immediately', sub: 'Starts right after launch', value: 'immediate' },
               { label: 'Set time window', sub: 'Only send between certain hours', value: 'window' },
             ].map(opt => (
               <div key={opt.value} style={{ ...s.schedOpt, ...(scheduleType === opt.value ? s.schedOptSel : {}) }} onClick={() => setScheduleType(opt.value)}>
@@ -415,7 +402,7 @@ const buildPayload = () => {
             </div>
             {getEstimate() && (
               <div style={{ ...s.infoBox, marginTop: '20px' }}>
-                Estimated time: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts at {speed}s delay
+                Estimated: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts at {speed}s delay
               </div>
             )}
           </div>
