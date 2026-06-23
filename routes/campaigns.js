@@ -41,6 +41,30 @@ router.post('/', async (req, res) => {
       console.log(`Variation ${i + 1}: ${v.subject}`);
     });
 
+    router.post('/', async (req, res) => {
+  try {
+    const {
+      name, subject, body_html, body_plain,
+      contact_list, delay_seconds, start_time, end_time,
+      schedule_type, content_variations, content_mode
+    } = req.body;
+
+    // Only campaign name is required
+    if (!name) return res.status(400).json({ error: 'Campaign name is required' });
+    if (!contact_list) return res.status(400).json({ error: 'Contact list is required' });
+
+    let parsedVariations = [];
+    try {
+      parsedVariations = JSON.parse(content_variations || '[]');
+    } catch (e) {
+      parsedVariations = [];
+    }
+
+    console.log(`Creating campaign with ${parsedVariations.length} variations`);
+    parsedVariations.forEach((v, i) => {
+      console.log(`Variation ${i + 1}: ${v.subject || '(no subject)'}`);
+    });
+
     const contacts = await db.get(
       'SELECT COUNT(*) as count FROM contacts WHERE list_name = $1',
       [contact_list]
