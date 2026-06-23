@@ -210,14 +210,10 @@ export default function Campaigns() {
   };
 
   const validate = () => {
-    if (!form.name) return showErr('Please enter a campaign name') || false;
-    if (!form.contact_list) return showErr('Please select a contact list') || false;
-    for (let i = 0; i < variations.length; i++) {
-      if (!variations[i].subject) return showErr(`Please enter subject line for Variation ${i + 1}`) || false;
-      if (!variations[i].body_html && !variations[i].body_plain) return showErr(`Please add email body for Variation ${i + 1}`) || false;
-    }
-    return true;
-  };
+  if (!form.name) return showErr('Please enter a campaign name') || false;
+  if (!form.contact_list) return showErr('Please select a contact list') || false;
+  return true;
+};
 
   const compressHtml = (html) => {
   if (!html) return '';
