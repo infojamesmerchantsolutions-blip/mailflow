@@ -54,7 +54,7 @@ const s = {
   templatePickRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' },
   templatePickSelect: { flex: 1, fontSize: '13px', padding: '7px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff' },
   templatePickBtn: { padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: 'none', background: '#534AB7', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' },
-  hintText: { fontSize: '11px', color: '#aaa', marginTop: '4px' },
+  hintText: { fontSize: '11px', color: '#aaa', fontWeight: '400' },
 };
 
 const speedOptions = [
@@ -78,12 +78,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
 
   useEffect(() => {
     if (previewRef.current) {
-      previewRef.current.srcdoc = `
-        <html>
-          <body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">
-            ${variation.body_html || '<p style="color:#aaa;">HTML preview will appear here...</p>'}
-          </body>
-        </html>`;
+      previewRef.current.srcdoc = `<html><body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">${variation.body_html || '<p style="color:#aaa;">HTML preview will appear here...</p>'}</body></html>`;
     }
   }, [variation.body_html]);
 
@@ -125,7 +120,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
         onChange={e => onChange({ ...variation, subject: e.target.value })}
       />
 
-      <div style={s.label}>HTML body <span style={s.hintText}>(optional — leave empty to send plain text only)</span></div>
+      <div style={s.label}>HTML body <span style={s.hintText}>(optional)</span></div>
       <div style={s.editorWrap}>
         <div>
           <div style={s.editorHeader}>HTML editor</div>
@@ -148,7 +143,7 @@ function VariationEditor({ variation, index, onChange, onRemove, showRemove, tem
         </div>
       </div>
 
-      <div style={s.label}>Plain text <span style={s.hintText}>(optional — used when HTML not available or as standalone)</span></div>
+      <div style={s.label}>Plain text <span style={s.hintText}>(optional)</span></div>
       <textarea
         style={s.plainTextarea}
         placeholder="Plain text version... or leave empty"
@@ -200,7 +195,6 @@ export default function Campaigns() {
     setVariations(variations.filter((_, i) => i !== index));
   };
 
-  // Only campaign name and contact list are required
   const validate = () => {
     if (!form.name) return showErr('Please enter a campaign name') || false;
     if (!form.contact_list) return showErr('Please select a contact list') || false;
@@ -212,12 +206,10 @@ export default function Campaigns() {
       if (!html) return '';
       return html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
     };
-
     const compressedVariations = variations.map(v => ({
       ...v,
       body_html: compressHtml(v.body_html),
     }));
-
     return {
       name: form.name,
       subject: compressedVariations[0]?.subject || '',
@@ -332,7 +324,7 @@ export default function Campaigns() {
           </div>
 
           <div style={s.infoBox}>
-            Only campaign name and contact list are required. Subject, HTML body and plain text are all optional — send whatever you have.
+            Only campaign name and contact list are required. Subject, HTML and plain text are all optional.
           </div>
 
           <hr style={s.divider} />
@@ -354,9 +346,7 @@ export default function Campaigns() {
             />
           ))}
 
-          <button style={s.addVariationBtn} onClick={addVariation}>
-            + Add another variation
-          </button>
+          <button style={s.addVariationBtn} onClick={addVariation}>+ Add another variation</button>
 
           <hr style={s.divider} />
 
@@ -403,7 +393,7 @@ export default function Campaigns() {
             </div>
             {getEstimate() && (
               <div style={{ ...s.infoBox, marginTop: '20px' }}>
-                Estimated: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts at {speed}s delay
+                Estimated: <strong>{getEstimate()}</strong> for {lists.find(l => l.list_name === form.contact_list)?.count} contacts at {speed}s
               </div>
             )}
           </div>
