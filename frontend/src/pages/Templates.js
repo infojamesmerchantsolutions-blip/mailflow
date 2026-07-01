@@ -12,8 +12,9 @@ const s = {
   card: { background: '#fff', border: '0.5px solid #e0e0d8', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
   cardTitle: { fontSize: '14px', fontWeight: '500', color: '#111', marginBottom: '14px' },
   label: { fontSize: '12px', color: '#666', marginBottom: '5px', marginTop: '10px' },
+  hint: { fontSize: '11px', color: '#aaa', fontWeight: '400' },
   input: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', outline: 'none' },
-  editorWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '0.5px solid #ccc', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' },
+  editorWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '0.5px solid #ccc', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' },
   editorHeader: { padding: '7px 12px', background: '#f5f5f0', borderBottom: '0.5px solid #ccc', fontSize: '12px', fontWeight: '500', color: '#666' },
   editorTextarea: { width: '100%', fontSize: '12px', padding: '10px', border: 'none', borderRight: '0.5px solid #ccc', resize: 'none', minHeight: '220px', fontFamily: 'monospace', lineHeight: '1.6', outline: 'none', background: '#fff' },
   plainTextarea: { width: '100%', fontSize: '13px', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #ccc', background: '#fff', resize: 'vertical', minHeight: '80px', lineHeight: '1.6', outline: 'none', fontFamily: 'inherit' },
@@ -22,68 +23,56 @@ const s = {
   templateSub: { fontSize: '12px', color: '#888', marginTop: '2px' },
   success: { background: '#eaf3de', border: '0.5px solid #c0dd97', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#3B6D11', marginBottom: '12px' },
   error: { background: '#fcebeb', border: '0.5px solid #f7c1c1', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#A32D2D', marginBottom: '12px' },
+  infoBox: { background: '#e6f1fb', border: '0.5px solid #b5d4f4', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#185FA5', marginBottom: '16px' },
   divider: { border: 'none', borderTop: '0.5px solid #e0e0d8', margin: '16px 0' },
   footerBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' },
   emptyBox: { textAlign: 'center', padding: '40px', color: '#888', fontSize: '13px' },
-  infoBox: { background: '#e6f1fb', border: '0.5px solid #b5d4f4', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#185FA5', marginBottom: '16px' },
   previewBox: { background: '#f5f5f0', borderRadius: '8px', padding: '14px', fontSize: '13px', lineHeight: '1.7', marginTop: '8px', maxHeight: '200px', overflow: 'auto' },
 };
-
-const defaultHtml = `<h2 style="color:#111;">Hello there!</h2>
-<p>This is your email content. You can use HTML to style it.</p>
-<p>Add images, buttons, links and more.</p>
-<a href="https://yoursite.com" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;border-radius:6px;text-decoration:none;">Click here</a>
-<p style="color:#888;font-size:12px;margin-top:24px;">To unsubscribe, reply to this email.</p>`;
 
 function TemplateEditor({ template, onSave, onCancel, isEditing }) {
   const [name, setName] = useState(template?.name || '');
   const [subject, setSubject] = useState(template?.subject || '');
-  const [bodyHtml, setBodyHtml] = useState(template?.body_html || defaultHtml);
-  const [bodyPlain, setBodyPlain] = useState(template?.body_plain || 'Hello there!\n\nThis is your email content.\n\nTo unsubscribe, reply to this email.');
+  const [bodyHtml, setBodyHtml] = useState(template?.body_html || '');
+  const [bodyPlain, setBodyPlain] = useState(template?.body_plain || '');
+  const [err, setErr] = useState('');
   const previewRef = useRef(null);
 
   useEffect(() => {
     if (previewRef.current) {
-      previewRef.current.srcdoc = `
-        <html>
-          <body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">
-            ${bodyHtml}
-          </body>
-        </html>`;
+      previewRef.current.srcdoc = `<html><body style="font-family:-apple-system,sans-serif;padding:16px;margin:0;font-size:13px;line-height:1.7;color:#111;">${bodyHtml || '<p style="color:#aaa;">HTML preview will appear here...</p>'}</body></html>`;
     }
   }, [bodyHtml]);
 
-  const compressHtml = (html) => {
-  if (!html) return '';
-  return html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
-};
-
-const handleSave = () => {
-  if (!name || !subject) return alert('Please enter a name and subject');
-  onSave({ name, subject, body_html: compressHtml(bodyHtml), body_plain: bodyPlain });
-};
+  const handleSave = () => {
+    if (!name.trim()) return setErr('Template name is required');
+    setErr('');
+    onSave({ name, subject, body_html: bodyHtml, body_plain: bodyPlain });
+  };
 
   return (
     <div style={s.card}>
       <div style={s.cardTitle}>{isEditing ? 'Edit template' : 'New template'}</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div>
-          <div style={s.label}>Template name</div>
-          <input style={s.input} placeholder="e.g. Black Friday offer" value={name} onChange={e => setName(e.target.value)} />
-        </div>
-        <div>
-          <div style={s.label}>Subject line</div>
-          <input style={s.input} placeholder="e.g. You don't want to miss this!" value={subject} onChange={e => setSubject(e.target.value)} />
-        </div>
+      <div style={s.infoBox}>
+        Only the template name is required. Subject, HTML body and plain text are all optional.
       </div>
 
-      <div style={s.label}>Email body (HTML + live preview)</div>
+      {err && <div style={s.error}>{err}</div>}
+
+      <div style={s.label}>Template name <span style={{ color: '#A32D2D' }}>*</span></div>
+      <input style={s.input} placeholder="e.g. Black Friday offer" value={name} onChange={e => setName(e.target.value)} />
+
+      <div style={s.label}>Subject line <span style={s.hint}>(optional)</span></div>
+      <input style={s.input} placeholder="Leave empty if not needed" value={subject} onChange={e => setSubject(e.target.value)} />
+
+      <div style={s.label}>HTML body <span style={s.hint}>(optional)</span></div>
       <div style={s.editorWrap}>
         <div>
           <div style={s.editorHeader}>HTML editor</div>
           <textarea
             style={s.editorTextarea}
+            placeholder="Paste your HTML here... or leave empty"
             value={bodyHtml}
             onChange={e => setBodyHtml(e.target.value)}
             spellCheck={false}
@@ -100,8 +89,13 @@ const handleSave = () => {
         </div>
       </div>
 
-      <div style={s.label}>Plain text fallback</div>
-      <textarea style={s.plainTextarea} value={bodyPlain} onChange={e => setBodyPlain(e.target.value)} />
+      <div style={s.label}>Plain text <span style={s.hint}>(optional)</span></div>
+      <textarea
+        style={s.plainTextarea}
+        placeholder="Plain text version... or leave empty"
+        value={bodyPlain}
+        onChange={e => setBodyPlain(e.target.value)}
+      />
 
       <div style={s.footerBtns}>
         <button style={s.btn} onClick={onCancel}>Cancel</button>
@@ -175,10 +169,6 @@ export default function Templates() {
       {msg && <div style={s.success}>{msg}</div>}
       {err && <div style={s.error}>{err}</div>}
 
-      <div style={s.infoBox}>
-        Create templates here and use them when building campaigns. Each campaign can use multiple templates — the system randomly picks one per recipient to avoid spam filters.
-      </div>
-
       {showForm && (
         <TemplateEditor
           onSave={handleCreate}
@@ -199,22 +189,29 @@ export default function Templates() {
       <div style={s.card}>
         <div style={s.cardTitle}>Saved templates ({templates.length})</div>
         {templates.length === 0 && (
-          <div style={s.emptyBox}>
-            No templates yet. Create one above to get started.
-          </div>
+          <div style={s.emptyBox}>No templates yet. Create one above.</div>
         )}
         {templates.map(t => (
           <div key={t.id}>
             <div style={s.templateRow}>
               <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
                 <div style={s.templateName}>{t.name}</div>
-                <div style={s.templateSub}>Subject: {t.subject} · Created {new Date(t.created_at).toLocaleDateString()}</div>
+                <div style={s.templateSub}>
+                  {t.subject ? `Subject: ${t.subject}` : 'No subject'}
+                  {' · '}
+                  {t.body_html ? 'Has HTML' : t.body_plain ? 'Plain text only' : 'No body'}
+                  {' · '}
+                  {new Date(t.created_at).toLocaleDateString()}
+                </div>
               </div>
               <button style={s.btn} onClick={() => { setEditingTemplate(t); setShowForm(false); }}>Edit</button>
               <button style={s.btnDanger} onClick={() => handleDelete(t.id, t.name)}>Delete</button>
             </div>
-            {expandedId === t.id && (
+            {expandedId === t.id && t.body_html && (
               <div style={s.previewBox} dangerouslySetInnerHTML={{ __html: t.body_html }} />
+            )}
+            {expandedId === t.id && !t.body_html && t.body_plain && (
+              <div style={s.previewBox}>{t.body_plain}</div>
             )}
           </div>
         ))}
