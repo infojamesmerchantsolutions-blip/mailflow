@@ -24,12 +24,15 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, subject, body_html, body_plain } = req.body;
-    if (!name || !subject) return res.status(400).json({ error: 'Name and subject are required' });
+    // Only name is required
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Template name is required' });
+    }
     const result = await db.run(`
       INSERT INTO templates (name, subject, body_html, body_plain)
       VALUES ($1, $2, $3, $4)
       RETURNING id
-    `, [name, subject, body_html, body_plain]);
+    `, [name.trim(), subject || '', body_html || '', body_plain || '']);
     res.json({ id: result.rows[0].id, success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,9 +42,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { name, subject, body_html, body_plain } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Template name is required' });
+    }
     await db.run(`
       UPDATE templates SET name = $1, subject = $2, body_html = $3, body_plain = $4 WHERE id = $5
-    `, [name, subject, body_html, body_plain, req.params.id]);
+    `, [name.trim(), subject || '', body_html || '', body_plain || '', req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
