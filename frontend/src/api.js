@@ -48,3 +48,15 @@ export const getAnalytics = () => API.get('/api/analytics');
 export const getAnalyticsOverview = () => API.get('/api/analytics/overview/stats');
 export const getCampaignOpens = (id) => API.get(`/api/analytics/${id}/opens`);
 export const getCampaignUnopened = (id) => API.get(`/api/analytics/${id}/unopened`);
+
+// Followups
+export const getCampaignFollowups = (campaignId) => API.get(`/api/followups/campaign/${campaignId}`);
+export const createFollowup = (data) => API.post('/api/followups', data);
+export const updateFollowup = (id, data) => API.put(`/api/followups/${id}`, data);
+export const deleteFollowup = (id) => API.delete(`/api/followups/${id}`);
+export const pauseFollowup = (id) => API.post(`/api/followups/${id}/pause`);
+export const resumeFollowup = (id) => API.post(`/api/followups/${id}/resume`);
+export const getFollowupStatus = (id) => API.get(`/api/followups/${id}/status`);
+export const getExclusions = (campaignId) => API.get(`/api/followups/exclusions/${campaignId}`);
+export const addExclusions = (data) => API.post('/api/followups/exclusions', data);
+export const removeExclusion = (id) => API.delete(`/api/followups/exclusions/${id}`);
