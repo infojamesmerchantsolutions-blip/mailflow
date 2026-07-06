@@ -138,6 +138,7 @@ app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/queue', require('./routes/queue'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/followups', require('./routes/followups').router);
 
 // Single aggregated dashboard endpoint
 app.get('/api/dashboard', async (req, res) => {
