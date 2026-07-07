@@ -5,6 +5,7 @@ import Contacts from './pages/Contacts';
 import Accounts from './pages/Accounts';
 import Logs from './pages/Logs';
 import Analytics from './pages/Analytics';
+import Followups from './pages/Followups';
 import Templates from './pages/Templates';
 import PinModal from './components/PinModal';
 
@@ -31,6 +32,7 @@ const navItems = [
   { id: 'templates', label: 'Templates', color: '#534AB7', protected: true },
   { id: 'contacts', label: 'Contacts', color: '#D85A30', protected: true },
   { id: 'accounts', label: 'Gmail Accounts', color: '#854F0B', protected: true },
+  { id: 'followups', label: 'Follow-ups', color: '#0E7C6E', protected: true },
   { id: 'analytics', label: 'Analytics', color: '#0E9E8E', protected: false },
   { id: 'logs', label: 'Logs', color: '#888', protected: false },
 ];
@@ -83,17 +85,18 @@ export default function App() {
   }, [pinVerified]);
 
   const renderPage = () => {
-    switch (page) {
-      case 'dashboard': return <Dashboard />;
-      case 'campaigns': return <Campaigns requirePin={requirePin} />;
-      case 'templates': return <Templates requirePin={requirePin} />;
-      case 'contacts': return <Contacts requirePin={requirePin} />;
-      case 'accounts': return <Accounts requirePin={requirePin} />;
-      case 'analytics': return <Analytics />;
-      case 'logs': return <Logs />;
-      default: return <Dashboard />;
-    }
-  };
+  switch (page) {
+    case 'dashboard': return <Dashboard />;
+    case 'campaigns': return <Campaigns requirePin={requirePin} />;
+    case 'templates': return <Templates requirePin={requirePin} />;
+    case 'contacts': return <Contacts requirePin={requirePin} />;
+    case 'accounts': return <Accounts requirePin={requirePin} />;
+    case 'followups': return <Followups requirePin={requirePin} />;
+    case 'analytics': return <Analytics />;
+    case 'logs': return <Logs />;
+    default: return <Dashboard />;
+  }
+};
 
   return (
     <div style={styles.shell}>
