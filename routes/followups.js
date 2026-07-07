@@ -21,14 +21,17 @@ router.post('/', async (req, res) => {
     const { campaign_id, name, subject, body_html, body_plain, delay_days, delay_hours } = req.body;
     if (!campaign_id) return res.status(400).json({ error: 'Campaign ID is required' });
 
+    // Use exact values — no fallback to 3
+    const days = delay_days !== undefined && delay_days !== null ? parseInt(delay_days) : 0;
+    const hours = delay_hours !== undefined && delay_hours !== null ? parseInt(delay_hours) : 0;
+
     const result = await db.run(`
       INSERT INTO followups (campaign_id, name, subject, body_html, body_plain, delay_days, delay_hours)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id
-    `, [campaign_id, name || '', subject || '', body_html || '', body_plain || '', delay_days || 3, delay_hours || 0]);
+    `, [campaign_id, name || '', subject || '', body_html || '', body_plain || '', days, hours]);
 
-    // Build followup queue for all sent emails in campaign
-    await buildFollowupQueue(result.rows[0].id, campaign_id, delay_days || 3, delay_hours || 0);
+    await buildFollowupQueue(result.rows[0].id, campaign_id, days, hours);
 
     res.json({ id: result.rows[0].id, success: true });
   } catch (err) {
@@ -36,10 +39,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Build followup queue
 async function buildFollowupQueue(followupId, campaignId, delayDays, delayHours) {
   try {
-    // Get all sent emails for this campaign that are not excluded
     const sentEmails = await db.all(`
       SELECT q.id, q.recipient_email, q.account_id, q.message_id, q.sent_at
       FROM queue q
@@ -51,7 +52,6 @@ async function buildFollowupQueue(followupId, campaignId, delayDays, delayHours)
     `, [campaignId]);
 
     for (const email of sentEmails) {
-      // Calculate scheduled time
       const sentAt = email.sent_at ? new Date(email.sent_at) : new Date();
       const scheduledAt = new Date(sentAt.getTime() + (delayDays * 24 * 60 * 60 * 1000) + (delayHours * 60 * 60 * 1000));
 
@@ -59,14 +59,9 @@ async function buildFollowupQueue(followupId, campaignId, delayDays, delayHours)
         INSERT INTO followup_queue 
           (followup_id, campaign_id, recipient_email, account_id, original_queue_id, message_id, status, scheduled_at)
         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
-        ON CONFLICT DO NOTHING
       `, [
-        followupId,
-        campaignId,
-        email.recipient_email,
-        email.account_id,
-        email.id,
-        email.message_id,
+        followupId, campaignId, email.recipient_email,
+        email.account_id, email.id, email.message_id,
         scheduledAt.toISOString()
       ]);
     }
@@ -81,10 +76,12 @@ async function buildFollowupQueue(followupId, campaignId, delayDays, delayHours)
 router.put('/:id', async (req, res) => {
   try {
     const { name, subject, body_html, body_plain, delay_days, delay_hours } = req.body;
+    const days = delay_days !== undefined && delay_days !== null ? parseInt(delay_days) : 0;
+    const hours = delay_hours !== undefined && delay_hours !== null ? parseInt(delay_hours) : 0;
     await db.run(`
       UPDATE followups SET name = $1, subject = $2, body_html = $3, body_plain = $4, 
       delay_days = $5, delay_hours = $6 WHERE id = $7
-    `, [name || '', subject || '', body_html || '', body_plain || '', delay_days || 3, delay_hours || 0, req.params.id]);
+    `, [name || '', subject || '', body_html || '', body_plain || '', days, hours, req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -165,10 +162,9 @@ router.post('/exclusions', async (req, res) => {
       if (!clean) continue;
       try {
         await db.run(
-          'INSERT INTO exclusions (campaign_id, email, reason) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          'INSERT INTO exclusions (campaign_id, email, reason) VALUES ($1, $2, $3)',
           [campaign_id || null, clean, reason || 'replied']
         );
-        // Remove from followup queue
         await db.run(
           "UPDATE followup_queue SET status = 'excluded' WHERE recipient_email = $1 AND campaign_id = $2 AND status = 'pending'",
           [clean, campaign_id]
